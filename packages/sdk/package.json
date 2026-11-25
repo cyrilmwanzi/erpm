@@ -1,0 +1,59 @@
+{
+  "name": "@scace/sdk",
+  "version": "1.0.0",
+  "description": "Typed TypeScript SDK for the Scace ERP API, AST-generated from NestJS controllers and Zod schemas.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./errors": {
+      "types": "./dist/esm/errors.d.ts",
+      "import": "./dist/esm/errors.js",
+      "require": "./dist/cjs/errors.js",
+      "default": "./dist/esm/errors.js"
+    },
+    "./generated": {
+      "types": "./dist/esm/generated/index.d.ts",
+      "import": "./dist/esm/generated/index.js",
+      "require": "./dist/cjs/generated/index.js",
+      "default": "./dist/esm/generated/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "sdk:generate": "node scripts/generate-sdk.mjs",
+    "prebuild": "pnpm sdk:generate",
+    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/write-dist-pkg.mjs",
+    "prelint": "pnpm sdk:generate",
+    "lint": "tsc -p tsconfig.esm.json --noEmit",
+    "pretypecheck": "pnpm sdk:generate",
+    "typecheck": "tsc -p tsconfig.esm.json --noEmit",
+    "pretest": "pnpm sdk:generate",
+    "test": "node scripts/verify-sdk.mjs",
+    "clean": "rm -rf dist src/generated *.tsbuildinfo"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@scace/typescript-config": "workspace:*",
+    "@types/node": "^22.14.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

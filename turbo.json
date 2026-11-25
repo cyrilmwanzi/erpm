@@ -40,6 +40,28 @@
     "@scace/db#test": {
       "dependsOn": ["db:generate"]
     },
+    "sdk:generate": {
+      "dependsOn": ["@scace/db#build"],
+      "cache": false
+    },
+    "@scace/sdk#sdk:generate": {
+      "dependsOn": ["@scace/db#build"],
+      "cache": false
+    },
+    "@scace/sdk#build": {
+      "dependsOn": ["@scace/db#build"],
+      "inputs": ["$TURBO_DEFAULT$", "../../apps/api/src/**/*.ts"],
+      "outputs": ["dist/**", "src/generated/**"]
+    },
+    "@scace/sdk#lint": {
+      "dependsOn": ["@scace/db#build"]
+    },
+    "@scace/sdk#typecheck": {
+      "dependsOn": ["@scace/db#build"]
+    },
+    "@scace/sdk#test": {
+      "dependsOn": ["@scace/sdk#build"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
