@@ -4,16 +4,21 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import type { FastifyReply } from "fastify";
 import {
   hasOrganizationPermission,
   type OrgPermissionRequirement,
 } from "../auth/permissions.js";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import {
+  BILLING_FEATURE_KEY,
+  BILLING_LOCK_EXEMPT_KEY,
   TENANT_PERMISSIONS_KEY,
   TENANT_ROLES_KEY,
   type AuthenticatedTenant,
@@ -31,10 +36,14 @@ export class TenantGuard implements CanActivate {
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(PrismaService) private readonly prismaService: PrismaService,
     @Inject(RedisService) private readonly redisService: RedisService,
+    @Optional()
+    @Inject(BillingEnforcementService)
+    private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<TenantScopedRequest>();
+    const reply = context.switchToHttp().getResponse<FastifyReply>();
     const userSession = request.session;
     const authContext = request.authContext;
 
@@ -140,6 +149,54 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException(
         "Insufficient organization permissions or token scope for the requested action.",
       );
+    }
+
+    if (this.billingEnforcement) {
+      const entitlement =
+        await this.billingEnforcement.evaluateOrganizationEntitlement(
+          organizationId,
+        );
+      request.billing = {
+        status: entitlement.status,
+        planCode: entitlement.planCode,
+        planId: entitlement.planId,
+        isLockedOut: entitlement.isLockedOut,
+        inGracePeriod: entitlement.inGracePeriod,
+        isExempt: entitlement.isExempt,
+        trialEndsAt: entitlement.trialEndsAt,
+        gracePeriodEndsAt: entitlement.gracePeriodEndsAt,
+        currentPeriodEnd: entitlement.currentPeriodEnd,
+        features: entitlement.features,
+      };
+
+      if (typeof reply?.header === "function") {
+        reply.header("X-Scace-Billing-Status", entitlement.status);
+        reply.header("X-Scace-Plan-Code", entitlement.planCode);
+        if (entitlement.inGracePeriod && entitlement.gracePeriodEndsAt) {
+          reply.header("X-Scace-Grace-Ends-At", entitlement.gracePeriodEndsAt);
+        }
+      }
+
+      const isBillingLockExempt =
+        this.reflector.getAllAndOverride<boolean>(BILLING_LOCK_EXEMPT_KEY, [
+          context.getHandler(),
+          context.getClass(),
+        ]) ?? false;
+
+      if (!isBillingLockExempt) {
+        this.billingEnforcement.assertNotLocked(entitlement);
+
+        const requiredFeature = this.reflector.getAllAndOverride<string>(
+          BILLING_FEATURE_KEY,
+          [context.getHandler(), context.getClass()],
+        );
+        if (requiredFeature) {
+          this.billingEnforcement.assertFeatureEnabled(
+            entitlement,
+            requiredFeature,
+          );
+        }
+      }
     }
 
     const tenant: AuthenticatedTenant = {

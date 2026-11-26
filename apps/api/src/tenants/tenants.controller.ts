@@ -15,6 +15,7 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { ORGANIZATION_ROLE_NAMES } from "../auth/permissions.js";
 import {
+  AllowWhenBillingLocked,
   CurrentTenant,
   RequireActiveTenant,
   RequiredOrgPermissions,
@@ -64,12 +65,14 @@ export class TenantsController {
   ) {}
 
   @Get("current")
+  @AllowWhenBillingLocked()
   @RequiredOrgPermissions({ tenantSettings: ["read"] })
   async getCurrentTenant(@CurrentTenant() tenant: AuthenticatedTenant) {
     return this.tenantsService.getCurrentTenantOverview(tenant);
   }
 
   @Get("permissions")
+  @AllowWhenBillingLocked()
   getPermissions(@CurrentTenant() tenant: AuthenticatedTenant) {
     return this.tenantsService.getEffectivePermissions(tenant);
   }

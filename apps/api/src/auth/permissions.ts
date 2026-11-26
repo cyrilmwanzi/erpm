@@ -13,7 +13,7 @@ export const erpStatements = {
   erpWorkspace: ["read", "create", "update", "delete"],
   item: ["read", "create", "update", "archive"],
   location: ["read", "create", "update", "archive"],
-  inventory: ["read", "adjust", "transfer"],
+  inventory: ["read", "adjust", "transfer", "manageExpiry", "writeOff"],
   supplier: ["read", "create", "update", "archive"],
   purchaseOrder: ["read", "create", "update", "submit", "receive", "qc", "accept", "cancel"],
   vendorBill: ["read", "create", "update", "pay", "void"],
@@ -38,6 +38,9 @@ export const erpStatements = {
   device: ["read", "approve", "update", "revoke"],
   ssoConfig: ["read", "configure"],
   production: ["read", "create", "update", "release", "schedule", "consume", "qc", "costing", "complete", "cancel"],
+  report: ["read", "export", "schedule"],
+  communication: ["read", "manage", "dispatch"],
+  billing: ["read", "manage"],
 } as const;
 
 export type ErpStatements = typeof erpStatements;
@@ -55,7 +58,7 @@ export const owner = ac.newRole({
   erpWorkspace: ["read", "create", "update", "delete"],
   item: ["read", "create", "update", "archive"],
   location: ["read", "create", "update", "archive"],
-  inventory: ["read", "adjust", "transfer"],
+  inventory: ["read", "adjust", "transfer", "manageExpiry", "writeOff"],
   supplier: ["read", "create", "update", "archive"],
   purchaseOrder: ["read", "create", "update", "submit", "receive", "qc", "accept", "cancel"],
   vendorBill: ["read", "create", "update", "pay", "void"],
@@ -80,6 +83,9 @@ export const owner = ac.newRole({
   device: ["read", "approve", "update", "revoke"],
   ssoConfig: ["read", "configure"],
   production: ["read", "create", "update", "release", "schedule", "consume", "qc", "costing", "complete", "cancel"],
+  report: ["read", "export", "schedule"],
+  communication: ["read", "manage", "dispatch"],
+  billing: ["read", "manage"],
 });
 
 export const admin = ac.newRole({
@@ -89,7 +95,7 @@ export const admin = ac.newRole({
   erpWorkspace: ["read", "create", "update", "delete"],
   item: ["read", "create", "update", "archive"],
   location: ["read", "create", "update", "archive"],
-  inventory: ["read", "adjust", "transfer"],
+  inventory: ["read", "adjust", "transfer", "manageExpiry", "writeOff"],
   supplier: ["read", "create", "update", "archive"],
   purchaseOrder: ["read", "create", "update", "submit", "receive", "qc", "accept", "cancel"],
   vendorBill: ["read", "create", "update", "pay", "void"],
@@ -114,6 +120,9 @@ export const admin = ac.newRole({
   device: ["read", "approve", "update", "revoke"],
   ssoConfig: ["read", "configure"],
   production: ["read", "create", "update", "release", "schedule", "consume", "qc", "costing", "complete", "cancel"],
+  report: ["read", "export", "schedule"],
+  communication: ["read", "manage", "dispatch"],
+  billing: ["read", "manage"],
 });
 
 export const manager = ac.newRole({
@@ -127,7 +136,7 @@ export const manager = ac.newRole({
   erpWorkspace: ["read", "create", "update"],
   item: ["read", "create", "update", "archive"],
   location: ["read", "create", "update", "archive"],
-  inventory: ["read", "adjust", "transfer"],
+  inventory: ["read", "adjust", "transfer", "manageExpiry", "writeOff"],
   supplier: ["read", "create", "update", "archive"],
   purchaseOrder: ["read", "create", "update", "submit", "receive", "qc", "accept", "cancel"],
   vendorBill: ["read", "create", "update", "pay", "void"],
@@ -151,6 +160,9 @@ export const manager = ac.newRole({
   device: ["read", "approve", "update", "revoke"],
   ssoConfig: [],
   production: ["read", "create", "update", "release", "schedule", "consume", "qc", "costing", "complete", "cancel"],
+  report: ["read", "export", "schedule"],
+  communication: ["read", "manage", "dispatch"],
+  billing: ["read"],
 });
 
 export const member = ac.newRole({
@@ -184,6 +196,9 @@ export const member = ac.newRole({
   device: ["read", "revoke"],
   ssoConfig: [],
   production: ["read", "create", "update", "consume", "complete"],
+  report: ["read", "export"],
+  communication: ["read"],
+  billing: ["read"],
 });
 
 export const viewer = ac.newRole({
@@ -220,6 +235,9 @@ export const viewer = ac.newRole({
   device: [],
   ssoConfig: [],
   production: ["read"],
+  report: ["read"],
+  communication: [],
+  billing: [],
 });
 
 export const organizationRoles = {
@@ -333,6 +351,9 @@ export function getResolvedPermissionsForRole(
     device: new Set(),
     ssoConfig: new Set(),
     production: new Set(),
+    report: new Set(),
+    communication: new Set(),
+    billing: new Set(),
   };
 
   for (const roleName of parseRoleNames(roleNameList(roleValue))) {
@@ -383,6 +404,9 @@ export function getResolvedPermissionsForRole(
     device: Array.from(resolved.device),
     ssoConfig: Array.from(resolved.ssoConfig),
     production: Array.from(resolved.production),
+    report: Array.from(resolved.report),
+    communication: Array.from(resolved.communication),
+    billing: Array.from(resolved.billing),
   };
 }
 

@@ -134,8 +134,53 @@ for (const key of [
   "observability",
   "health",
   "system",
+  "billing",
+  "systemBilling",
 ]) {
   assert.ok(key in sdk, `Missing namespace sdk.${key}`);
+}
+for (const billingKey of [
+  "getSubscription",
+  "getBillingOptions",
+  "listInvoices",
+  "listPayments",
+  "createCheckout",
+  "initiateMpesaPayment",
+  "queryMpesaStatus",
+  "simulateMpesaCallback",
+]) {
+  assert.equal(typeof sdk.billing[billingKey], "function", `Missing sdk.billing.${billingKey}`);
+}
+for (const sysBillingKey of [
+  "getPlatformConfig",
+  "updatePlatformConfig",
+  "upsertPlatformMpesaConfig",
+  "rotatePlatformMpesaToken",
+  "testPlatformMpesaConnection",
+  "listPlans",
+  "createPlan",
+  "updatePlan",
+  "listOrganizations",
+  "getOrganizationBilling",
+  "updateOrganizationSubscription",
+  "upsertOrganizationOverride",
+  "clearOrganizationOverride",
+  "extendOrganizationTrial",
+  "suspendOrganization",
+  "reactivateOrganization",
+  "createAdminInvoice",
+  "markInvoicePaid",
+  "waiveInvoice",
+  "voidInvoice",
+  "listAuditLogs",
+  "listSystemAdmins",
+  "setUserPlatformRole",
+]) {
+  assert.equal(
+    typeof sdk.systemBilling[sysBillingKey],
+    "function",
+    `Missing sdk.systemBilling.${sysBillingKey}`,
+  );
 }
 for (const variantKey of [
   "createOption",

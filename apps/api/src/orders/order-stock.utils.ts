@@ -1,5 +1,10 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { LocationStatus, Prisma, StockMovementType } from "@scace/db";
+import {
+  allocateAndDeductLotsInTx,
+  assertReservableStockExpiryInTx,
+  recordAllocatedStockMovementsInTx,
+} from "../locations/lot-allocation.utils.js";
 
 export interface StockTargetRequirement {
   itemId: string;
@@ -69,7 +74,12 @@ export async function reserveStockBalance(
 
   const item = await tx.item.findFirstOrThrow({
     where: { id: params.itemId, organizationId: params.organizationId },
-    select: { sku: true, trackInventory: true, allowNegativeStock: true },
+    select: {
+      sku: true,
+      trackInventory: true,
+      allowNegativeStock: true,
+      trackExpiry: true,
+    },
   });
   if (!item.trackInventory) return;
 
@@ -92,6 +102,19 @@ export async function reserveStockBalance(
       `Insufficient available stock to reserve SKU "${item.sku}" at "${params.locationCode}" (available: ${available}, requested: ${params.baseQty}).`,
     );
   }
+
+  await assertReservableStockExpiryInTx(tx, {
+    organizationId: params.organizationId,
+    itemId: params.itemId,
+    sku: item.sku,
+    trackExpiry: item.trackExpiry,
+    allowNegativeStock: item.allowNegativeStock,
+    locationId: params.locationId,
+    locationCode: params.locationCode,
+    stockBalanceOnHand: onHand,
+    alreadyReservedQty: reserved,
+    requestedBaseQty: params.baseQty,
+  });
 
   if (bal) {
     await tx.stockBalance.update({
@@ -130,7 +153,13 @@ export async function deductStockBalance(
 
   const item = await tx.item.findFirstOrThrow({
     where: { id: params.itemId, organizationId: params.organizationId },
-    select: { sku: true, trackInventory: true, allowNegativeStock: true },
+    select: {
+      sku: true,
+      trackInventory: true,
+      allowNegativeStock: true,
+      trackExpiry: true,
+      lotAllocationStrategy: true,
+    },
   });
   if (!item.trackInventory) return;
 
@@ -153,39 +182,53 @@ export async function deductStockBalance(
     );
   }
 
+  const allocation = await allocateAndDeductLotsInTx(tx, {
+    organizationId: params.organizationId,
+    itemId: params.itemId,
+    sku: item.sku,
+    trackExpiry: item.trackExpiry,
+    allowNegativeStock: item.allowNegativeStock,
+    lotAllocationStrategy: item.lotAllocationStrategy,
+    locationId: params.locationId,
+    locationCode: params.locationCode,
+    currentBalanceOnHand: currentQty,
+    baseQty: params.baseQty,
+  });
+
   const nextReserved = Math.max(
     0,
     (bal?.reservedQty ?? 0) - params.releaseReservedQty,
   );
 
-  const updatedBalance = bal
-    ? await tx.stockBalance.update({
-        where: { id: bal.id },
-        data: { onHandQty: nextQty, reservedQty: nextReserved },
-      })
-    : await tx.stockBalance.create({
-        data: {
-          organizationId: params.organizationId,
-          itemId: params.itemId,
-          locationId: params.locationId,
-          onHandQty: nextQty,
-          reservedQty: 0,
-        },
-      });
+  if (bal) {
+    await tx.stockBalance.update({
+      where: { id: bal.id },
+      data: { onHandQty: nextQty, reservedQty: nextReserved },
+    });
+  } else {
+    await tx.stockBalance.create({
+      data: {
+        organizationId: params.organizationId,
+        itemId: params.itemId,
+        locationId: params.locationId,
+        onHandQty: nextQty,
+        reservedQty: 0,
+      },
+    });
+  }
 
-  await tx.stockMovement.create({
-    data: {
-      organizationId: params.organizationId,
-      itemId: params.itemId,
-      locationId: params.locationId,
-      type: StockMovementType.SALE,
-      quantityDelta: -params.baseQty,
-      balanceAfter: updatedBalance.onHandQty,
-      referenceType: params.referenceType,
-      referenceId: params.referenceId,
-      reason: params.reason,
-      actorUserId: params.actorUserId,
-    },
+  await recordAllocatedStockMovementsInTx(tx, {
+    organizationId: params.organizationId,
+    itemId: params.itemId,
+    locationId: params.locationId,
+    type: StockMovementType.SALE,
+    startingBalanceOnHand: currentQty,
+    usedLots: allocation.usedLots,
+    unlottedQty: allocation.unlottedQty,
+    referenceType: params.referenceType,
+    referenceId: params.referenceId,
+    reason: params.reason,
+    actorUserId: params.actorUserId,
   });
 }
 

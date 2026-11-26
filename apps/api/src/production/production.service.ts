@@ -30,6 +30,7 @@ import {
   InventoryService,
   type SuggestLotsInput,
 } from "../locations/inventory.service.js";
+import { computeExpiresAtFromShelfLife } from "../locations/lot-allocation.utils.js";
 import {
   type BulkQuantityInput,
 } from "../procurement/delivery-units.utils.js";
@@ -1088,7 +1089,12 @@ export class ProductionService {
         const manufacturedAt = input.manufacturedAt
           ? new Date(input.manufacturedAt)
           : now;
-        const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+        const expiresAt = input.expiresAt
+          ? new Date(input.expiresAt)
+          : computeExpiresAtFromShelfLife(
+              manufacturedAt,
+              batch.outputItem.shelfLifeDays,
+            );
         if (expiresAt && expiresAt.getTime() <= manufacturedAt.getTime()) {
           throw new BadRequestException(
             "Output lot expiration date must be after manufacturing date.",
@@ -1152,6 +1158,7 @@ export class ProductionService {
               type: StockMovementType.PRODUCTION_OUTPUT,
               quantityDelta: actualOutputQty,
               balanceAfter: bal.onHandQty,
+              stockLotId: outputLotId,
               referenceType: "ProductionBatch",
               referenceId: batch.id,
               reason: `Completed production batch ${batch.batchNumber}`,

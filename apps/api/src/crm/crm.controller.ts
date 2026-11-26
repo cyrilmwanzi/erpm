@@ -21,6 +21,7 @@ import { z } from "zod";
 import {
   CurrentTenant,
   RequireActiveTenant,
+  RequiredBillingFeature,
   RequiredOrgPermissions,
   type AuthenticatedTenant,
 } from "../tenancy/tenant.decorators.js";
@@ -182,6 +183,7 @@ const listWebhookQuerySchema = z.object({
 });
 
 @Controller("api/v1/crm")
+@RequiredBillingFeature("crm")
 export class CrmController {
   constructor(
     @Inject(CrmConnectionService)

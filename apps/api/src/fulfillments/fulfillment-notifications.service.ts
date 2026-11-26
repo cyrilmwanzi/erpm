@@ -614,7 +614,12 @@ export class FulfillmentNotificationsService {
 
     const crmCtx = await this.resolveOptionalCrmConnection(organizationId);
 
-    if (crmCtx) {
+    if (
+      crmCtx &&
+      (channel === CommunicationChannel.EMAIL ||
+        channel === CommunicationChannel.SMS ||
+        channel === CommunicationChannel.WHATSAPP)
+    ) {
       try {
         const res = await this.customerMatesClient.sendCommunication(crmCtx, {
           channel,

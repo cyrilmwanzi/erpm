@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   CustomerPaymentStatus,
@@ -21,6 +22,7 @@ import {
   StockMovementType,
   TenantContext,
 } from "@scace/db";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { MpesaPaymentService } from "../payments/mpesa-payment.service.js";
@@ -35,8 +37,10 @@ import {
 import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
 import type { PrintableReceiptDocument } from "./document-renderer.utils.js";
 import {
+  deductStockBalance as deductSharedStockBalance,
   releaseOrderStockInTransaction,
   reserveOrderStockInTransaction,
+  reserveStockBalance as reserveSharedStockBalance,
 } from "./order-stock.utils.js";
 
 export interface OrderLineInput {
@@ -147,6 +151,9 @@ export class OrdersService {
     private readonly analyticsService: AnalyticsService,
     @Inject(MpesaPaymentService)
     private readonly mpesaPaymentService: MpesaPaymentService,
+    @Optional()
+    @Inject(BillingEnforcementService)
+    private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
   async posCheckout(
@@ -155,6 +162,10 @@ export class OrdersService {
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
+    await this.billingEnforcement?.assertQuotaAvailable(
+      organizationId,
+      "maxMonthlyOrders",
+    );
     const resolvedMethod = input.paymentMethod ?? PaymentMethod.CASH;
 
     if (
@@ -661,6 +672,10 @@ export class OrdersService {
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
+    await this.billingEnforcement?.assertQuotaAvailable(
+      organizationId,
+      "maxMonthlyOrders",
+    );
 
     const [location, customer, settings] = await Promise.all([
       this.prismaService.raw.location.findFirst({
@@ -1965,50 +1980,7 @@ export class OrdersService {
       baseQty: number;
     },
   ) {
-    if (params.baseQty <= 0) return;
-
-    const item = await tx.item.findFirstOrThrow({
-      where: { id: params.itemId, organizationId: params.organizationId },
-      select: { sku: true, trackInventory: true, allowNegativeStock: true },
-    });
-    if (!item.trackInventory) return;
-
-    const bal = await tx.stockBalance.findUnique({
-      where: {
-        organizationId_itemId_locationId: {
-          organizationId: params.organizationId,
-          itemId: params.itemId,
-          locationId: params.locationId,
-        },
-      },
-    });
-
-    const onHand = bal?.onHandQty ?? 0;
-    const reserved = bal?.reservedQty ?? 0;
-    const available = onHand - reserved;
-
-    if (available < params.baseQty && !item.allowNegativeStock) {
-      throw new BadRequestException(
-        `Insufficient available stock to reserve SKU "${item.sku}" at "${params.locationCode}" (available: ${available}, requested: ${params.baseQty}).`,
-      );
-    }
-
-    if (bal) {
-      await tx.stockBalance.update({
-        where: { id: bal.id },
-        data: { reservedQty: reserved + params.baseQty },
-      });
-    } else {
-      await tx.stockBalance.create({
-        data: {
-          organizationId: params.organizationId,
-          itemId: params.itemId,
-          locationId: params.locationId,
-          onHandQty: 0,
-          reservedQty: params.baseQty,
-        },
-      });
-    }
+    return reserveSharedStockBalance(tx, params);
   }
 
   private async deductStockBalance(
@@ -2026,67 +1998,7 @@ export class OrdersService {
       actorUserId: string;
     },
   ) {
-    if (params.baseQty <= 0) return;
-
-    const item = await tx.item.findFirstOrThrow({
-      where: { id: params.itemId, organizationId: params.organizationId },
-      select: { sku: true, trackInventory: true, allowNegativeStock: true },
-    });
-    if (!item.trackInventory) return;
-
-    const bal = await tx.stockBalance.findUnique({
-      where: {
-        organizationId_itemId_locationId: {
-          organizationId: params.organizationId,
-          itemId: params.itemId,
-          locationId: params.locationId,
-        },
-      },
-    });
-
-    const currentQty = bal?.onHandQty ?? 0;
-    const nextQty = currentQty - params.baseQty;
-
-    if (nextQty < 0 && !item.allowNegativeStock) {
-      throw new BadRequestException(
-        `Insufficient stock for SKU "${item.sku}" at location "${params.locationCode}" (on hand: ${currentQty}, needed: ${params.baseQty}).`,
-      );
-    }
-
-    const nextReserved = Math.max(
-      0,
-      (bal?.reservedQty ?? 0) - params.releaseReservedQty,
-    );
-
-    const updatedBalance = bal
-      ? await tx.stockBalance.update({
-          where: { id: bal.id },
-          data: { onHandQty: nextQty, reservedQty: nextReserved },
-        })
-      : await tx.stockBalance.create({
-          data: {
-            organizationId: params.organizationId,
-            itemId: params.itemId,
-            locationId: params.locationId,
-            onHandQty: nextQty,
-            reservedQty: 0,
-          },
-        });
-
-    await tx.stockMovement.create({
-      data: {
-        organizationId: params.organizationId,
-        itemId: params.itemId,
-        locationId: params.locationId,
-        type: StockMovementType.SALE,
-        quantityDelta: -params.baseQty,
-        balanceAfter: updatedBalance.onHandQty,
-        referenceType: params.referenceType,
-        referenceId: params.referenceId,
-        reason: params.reason,
-        actorUserId: params.actorUserId,
-      },
-    });
+    return deductSharedStockBalance(tx, params);
   }
 
   private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {

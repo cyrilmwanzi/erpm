@@ -10,7 +10,12 @@ import {
   Query,
   Req,
 } from "@nestjs/common";
-import { ItemStatus, ItemType, ItemVariantKind } from "@scace/db";
+import {
+  ItemStatus,
+  ItemType,
+  ItemVariantKind,
+  LotAllocationStrategy,
+} from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -39,6 +44,12 @@ const itemVariantKindEnum = z.enum([
   ItemVariantKind.STANDARD,
   ItemVariantKind.TEMPLATE,
   ItemVariantKind.VARIANT,
+]);
+
+const lotAllocationStrategyEnum = z.enum([
+  LotAllocationStrategy.FEFO,
+  LotAllocationStrategy.FIFO,
+  LotAllocationStrategy.MANUAL,
 ]);
 
 const mutableStatusEnum = z.enum([ItemStatus.DRAFT, ItemStatus.ACTIVE]);
@@ -76,6 +87,11 @@ const createItemSchema = z.object({
   trackInventory: z.boolean().optional(),
   allowNegativeStock: z.boolean().optional(),
   reorderPoint: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+  trackExpiry: z.boolean().optional(),
+  shelfLifeDays: z.number().int().min(1).max(36500).nullable().optional(),
+  expiryWarningDays: z.number().int().min(0).max(3650).nullable().optional(),
+  expiryCriticalDays: z.number().int().min(0).max(3650).nullable().optional(),
+  lotAllocationStrategy: lotAllocationStrategyEnum.optional(),
   isBundle: z.boolean().optional(),
   variantKind: z
     .enum([ItemVariantKind.STANDARD, ItemVariantKind.TEMPLATE])
@@ -98,6 +114,11 @@ const updateItemSchema = z.object({
   trackInventory: z.boolean().optional(),
   allowNegativeStock: z.boolean().optional(),
   reorderPoint: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+  trackExpiry: z.boolean().optional(),
+  shelfLifeDays: z.number().int().min(1).max(36500).nullable().optional(),
+  expiryWarningDays: z.number().int().min(0).max(3650).nullable().optional(),
+  expiryCriticalDays: z.number().int().min(0).max(3650).nullable().optional(),
+  lotAllocationStrategy: lotAllocationStrategyEnum.optional(),
   isBundle: z.boolean().optional(),
   tags: tagsSchema.optional(),
   metadata: metadataSchema.optional(),

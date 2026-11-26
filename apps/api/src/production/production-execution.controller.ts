@@ -20,6 +20,7 @@ import { z } from "zod";
 import {
   CurrentTenant,
   RequireActiveTenant,
+  RequiredBillingFeature,
   RequiredOrgPermissions,
   type AuthenticatedTenant,
 } from "../tenancy/tenant.decorators.js";
@@ -129,6 +130,7 @@ const addCostEntrySchema = z.object({
 
 @Controller("api/v1/production")
 @RequireActiveTenant()
+@RequiredBillingFeature("production")
 export class ProductionExecutionController {
   constructor(
     @Inject(ProductionExecutionService)

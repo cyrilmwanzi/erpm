@@ -114,6 +114,41 @@ const envSchema = z.object({
     .min(1000)
     .max(60000)
     .default(15000),
+  COMMUNICATION_WEBHOOK_ENCRYPTION_KEY: z.string().optional(),
+  COMMUNICATION_ALLOW_PRIVATE_WEBHOOKS: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  COMMUNICATION_WEBHOOK_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(30000)
+    .default(10000),
+  EXPIRY_SCANNER_ENABLED: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  REPORT_SCHEDULER_ENABLED: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  OUTBOX_DISPATCHER_ENABLED: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  SYSTEM_ADMIN_EMAILS: z.string().optional(),
+  BILLING_DEFAULT_TRIAL_DAYS: z.coerce.number().int().min(0).max(365).default(14),
+  BILLING_DEFAULT_GRACE_DAYS: z.coerce.number().int().min(0).max(90).default(7),
+  BILLING_AUTO_PROVISION_TRIAL: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  BILLING_ENFORCEMENT_ENABLED: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  BILLING_ENCRYPTION_KEY: z.string().optional(),
 });
 
 export type AppEnv = Omit<
@@ -147,6 +182,10 @@ export type AppEnv = Omit<
   | "POSTHOG_ENABLED"
   | "PAYMENTS_ENCRYPTION_KEY"
   | "MPESA_PUBLIC_CALLBACK_BASE_URL"
+  | "SYSTEM_ADMIN_EMAILS"
+  | "BILLING_AUTO_PROVISION_TRIAL"
+  | "BILLING_ENFORCEMENT_ENABLED"
+  | "BILLING_ENCRYPTION_KEY"
 > & {
   BETTER_AUTH_SECRET: string;
   CORS_ALLOWED_ORIGINS: string[];
@@ -177,6 +216,10 @@ export type AppEnv = Omit<
   POSTHOG_ENABLED: boolean;
   PAYMENTS_ENCRYPTION_KEY: string | null;
   MPESA_PUBLIC_CALLBACK_BASE_URL: string;
+  SYSTEM_ADMIN_EMAILS: string[];
+  BILLING_AUTO_PROVISION_TRIAL: boolean;
+  BILLING_ENFORCEMENT_ENABLED: boolean;
+  BILLING_ENCRYPTION_KEY: string | null;
 };
 
 let cachedEnv: AppEnv | null = null;
@@ -269,6 +312,15 @@ export function getEnv(): AppEnv {
       trimOptional(parsed.MPESA_PUBLIC_CALLBACK_BASE_URL) ?? appUrl
     ).replace(/\/+$/, ""),
     MPESA_REQUEST_TIMEOUT_MS: parsed.MPESA_REQUEST_TIMEOUT_MS,
+    SYSTEM_ADMIN_EMAILS: (parsed.SYSTEM_ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter((email) => email.length > 0),
+    BILLING_DEFAULT_TRIAL_DAYS: parsed.BILLING_DEFAULT_TRIAL_DAYS,
+    BILLING_DEFAULT_GRACE_DAYS: parsed.BILLING_DEFAULT_GRACE_DAYS,
+    BILLING_AUTO_PROVISION_TRIAL: parsed.BILLING_AUTO_PROVISION_TRIAL ?? true,
+    BILLING_ENFORCEMENT_ENABLED: parsed.BILLING_ENFORCEMENT_ENABLED ?? true,
+    BILLING_ENCRYPTION_KEY: trimOptional(parsed.BILLING_ENCRYPTION_KEY),
   };
 
   return cachedEnv;

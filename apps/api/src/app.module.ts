@@ -6,10 +6,13 @@ import { auth } from "./auth/auth.config.js";
 import { EnterpriseAuthModule } from "./auth/enterprise-auth.module.js";
 import { MeController } from "./auth/me.controller.js";
 import { UnifiedAuthGuard } from "./auth/unified-auth.guard.js";
+import { BillingModule } from "./billing/billing.module.js";
+import { CommunicationsModule } from "./communications/communications.module.js";
 import { CrmModule } from "./crm/crm.module.js";
 import { CustomersModule } from "./customers/customers.module.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { EmailModule } from "./email/email.module.js";
+import { ExpiryModule } from "./expiry/expiry.module.js";
 import { FulfillmentsModule } from "./fulfillments/fulfillments.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { ItemsModule } from "./items/items.module.js";
@@ -23,6 +26,7 @@ import { PricingModule } from "./pricing/pricing.module.js";
 import { ProcurementModule } from "./procurement/procurement.module.js";
 import { ProductionModule } from "./production/production.module.js";
 import { RedisModule } from "./redis/redis.module.js";
+import { ReportsModule } from "./reports/reports.module.js";
 import { StaffModule } from "./staff/staff.module.js";
 import { StorageModule } from "./storage/storage.module.js";
 import { TenancyModule } from "./tenancy/tenancy.module.js";
@@ -38,6 +42,7 @@ import { VariantsModule } from "./variants/variants.module.js";
     StorageModule,
     EmailModule,
     TenancyModule,
+    BillingModule,
     AuthModule.forRoot({
       auth,
       isGlobal: true,
@@ -64,6 +69,9 @@ import { VariantsModule } from "./variants/variants.module.js";
     OrdersModule,
     PaymentsModule,
     FulfillmentsModule,
+    CommunicationsModule,
+    ExpiryModule,
+    ReportsModule,
   ],
   controllers: [MeController],
   providers: [

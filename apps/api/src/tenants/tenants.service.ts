@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import type { Prisma } from "@scace/db";
 import { APIError } from "better-auth/api";
@@ -21,6 +22,7 @@ import {
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { deriveOrganizationBucketName } from "../storage/storage.utils.js";
 import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
@@ -46,6 +48,9 @@ export class TenantsService {
     @Inject(RedisService) private readonly redisService: RedisService,
     @Inject(AnalyticsService)
     private readonly analyticsService: AnalyticsService,
+    @Optional()
+    @Inject(BillingEnforcementService)
+    private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
   async getCurrentTenantOverview(tenant: AuthenticatedTenant) {
@@ -442,6 +447,11 @@ export class TenantsService {
         "Only an organization owner can invite a new owner.",
       );
     }
+
+    await this.billingEnforcement?.assertQuotaAvailable(
+      tenant.organizationId,
+      "maxMembers",
+    );
 
     try {
       const invitation = await auth.api.createInvitation({

@@ -17,6 +17,7 @@ import { attachStoredObjectSchema } from "../storage/attachments.service.js";
 import {
   CurrentTenant,
   RequireActiveTenant,
+  RequiredBillingFeature,
   RequiredOrgPermissions,
   type AuthenticatedTenant,
 } from "../tenancy/tenant.decorators.js";
@@ -132,6 +133,7 @@ const cancelBatchSchema = z.object({
 
 @Controller("api/v1/production")
 @RequireActiveTenant()
+@RequiredBillingFeature("production")
 export class ProductionController {
   constructor(
     @Inject(ProductionService)

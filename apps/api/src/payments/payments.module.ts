@@ -14,6 +14,11 @@ import { MpesaController } from "./mpesa.controller.js";
     MpesaSettlementService,
     MpesaPaymentService,
   ],
-  exports: [MpesaConfigService, MpesaPaymentService, MpesaSettlementService],
+  exports: [
+    MpesaDarajaClient,
+    MpesaConfigService,
+    MpesaPaymentService,
+    MpesaSettlementService,
+  ],
 })
 export class PaymentsModule {}

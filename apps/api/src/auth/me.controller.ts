@@ -1,4 +1,6 @@
 import { Controller, Get, Inject, Req, UnauthorizedException } from "@nestjs/common";
+import { PlatformRole } from "@scace/db";
+import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
 
@@ -22,7 +24,11 @@ export class MeController {
         select: { id: true, name: true, slug: true, logo: true },
       });
       return {
-        user: userSession.user,
+        user: {
+          ...userSession.user,
+          platformRole: PlatformRole.USER,
+          isSystemAdmin: false,
+        },
         activeOrganizationId: authContext.organizationId,
         authContext,
         organizations: org
@@ -37,26 +43,46 @@ export class MeController {
       };
     }
 
-    const memberships = await this.prismaService.raw.member.findMany({
-      where: { userId: userSession.user.id },
-      select: {
-        id: true,
-        role: true,
-        createdAt: true,
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            logo: true,
+    const [dbUser, memberships] = await Promise.all([
+      this.prismaService.raw.user.findUnique({
+        where: { id: userSession.user.id },
+        select: { platformRole: true, email: true, emailVerified: true },
+      }),
+      this.prismaService.raw.member.findMany({
+        where: { userId: userSession.user.id },
+        select: {
+          id: true,
+          role: true,
+          createdAt: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logo: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "asc" },
-    });
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+
+    const env = getEnv();
+    const emailLower = (dbUser?.email ?? userSession.user.email).toLowerCase();
+    const isAllowlisted = env.SYSTEM_ADMIN_EMAILS.includes(emailLower);
+    const effectivePlatformRole =
+      isAllowlisted || dbUser?.platformRole === PlatformRole.SYSTEM_ADMIN
+        ? PlatformRole.SYSTEM_ADMIN
+        : PlatformRole.USER;
 
     return {
-      user: userSession.user,
+      user: {
+        ...userSession.user,
+        platformRole: effectivePlatformRole,
+        isSystemAdmin:
+          effectivePlatformRole === PlatformRole.SYSTEM_ADMIN &&
+          (dbUser?.emailVerified ?? userSession.user.emailVerified ?? false),
+      },
       activeOrganizationId:
         authContext?.organizationId ??
         userSession.session?.activeOrganizationId ??

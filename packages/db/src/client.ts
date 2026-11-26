@@ -84,6 +84,15 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   "ItemTemplateOption",
   "ItemTemplateOptionValue",
   "ItemVariantAttribute",
+  "StockExpiryPolicy",
+  "StockExpiryAlert",
+  "StockExpiryWriteOff",
+  "ReportSchedule",
+  "ReportRun",
+  "AlertRule",
+  "CommunicationWebhook",
+  "CommunicationOutboxEvent",
+  "CommunicationDeliveryAttempt",
 ]);
 
 let sharedPool: Pool | null = null;

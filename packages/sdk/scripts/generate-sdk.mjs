@@ -758,6 +758,11 @@ function mapControllerMethodToNamespace(controllerName, fullPath, methodName) {
     AvailabilityCalendarController: ["calendar"],
     CalendarController: ["calendar"],
     StorageController: ["storage"],
+    ExpiryController: ["expiry"],
+    ReportsController: ["reports"],
+    CommunicationsController: ["communications"],
+    SystemBillingController: ["systemBilling"],
+    OrgBillingController: ["billing"],
   };
 
   const namespacePath = directMap[controllerName] ?? [

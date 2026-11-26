@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   LocationStatus,
@@ -12,6 +13,7 @@ import {
   TenantContext,
   type Location,
 } from "@scace/db";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
@@ -86,6 +88,9 @@ export class LocationsService {
   constructor(
     @Inject(PrismaService) private readonly prismaService: PrismaService,
     @Inject(RedisService) private readonly redisService: RedisService,
+    @Optional()
+    @Inject(BillingEnforcementService)
+    private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
   async createLocation(
@@ -94,6 +99,10 @@ export class LocationsService {
     ipAddress?: string,
   ): Promise<Location> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
+    await this.billingEnforcement?.assertQuotaAvailable(
+      organizationId,
+      "maxLocations",
+    );
     const code = input.code.trim().toUpperCase();
     const status = input.status ?? LocationStatus.ACTIVE;
 

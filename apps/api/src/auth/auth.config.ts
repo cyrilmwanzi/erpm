@@ -1,9 +1,10 @@
-import { prisma, type Prisma } from "@scace/db";
+import { prisma, PlatformRole, type Prisma } from "@scace/db";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { redisStorage } from "@better-auth/redis-storage";
 import { betterAuth } from "better-auth";
 import { bearer, genericOAuth, organization } from "better-auth/plugins";
 import { Redis } from "ioredis";
+import { provisionInitialTrialForOrganization } from "../billing/billing-bootstrap.service.js";
 import { getEnv } from "../config/env.js";
 import { emailDelivery } from "../email/email.service.js";
 import { createRedisClientWithFallback, MockRedis } from "../redis/redis-mock.js";
@@ -332,6 +333,24 @@ export const auth = betterAuth({
     },
   },
   databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          if (
+            env.SYSTEM_ADMIN_EMAILS.includes(user.email.trim().toLowerCase())
+          ) {
+            try {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { platformRole: PlatformRole.SYSTEM_ADMIN },
+              });
+            } catch {
+              // Non-fatal if DB is offline mock
+            }
+          }
+        },
+      },
+    },
     session: {
       create: {
         before: async (session) => {
@@ -406,6 +425,15 @@ export const auth = betterAuth({
             email: user.email,
             name: user.name,
           });
+          try {
+            await provisionInitialTrialForOrganization(org.id, user.id, prisma);
+          } catch (err) {
+            console.warn(
+              `[better-auth:billing] Failed to auto-provision trial for org ${org.id}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
 
           await recordOrganizationAudit({
             organizationId: org.id,

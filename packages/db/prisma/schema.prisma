@@ -11,12 +11,18 @@ datasource db {
 // Better Auth Core & Organization Models
 // ==========================================
 
+enum PlatformRole {
+  USER
+  SYSTEM_ADMIN
+}
+
 model User {
   id            String       @id
   name          String
   email         String       @unique
   emailVerified Boolean      @default(false)
   image         String?
+  platformRole  PlatformRole @default(USER)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   sessions      Session[]
@@ -27,6 +33,7 @@ model User {
   oauthAuthorizationCodes OAuthAuthorizationCode[]
   oauthRefreshTokens      OAuthRefreshToken[]
   registeredDevices       RegisteredDevice[]
+  platformBillingAudits   PlatformBillingAuditLog[]
 
   @@map("user")
 }
@@ -166,6 +173,20 @@ model Organization {
   itemTemplateOptions       ItemTemplateOption[]
   itemTemplateOptionValues  ItemTemplateOptionValue[]
   itemVariantAttributes     ItemVariantAttribute[]
+  stockExpiryPolicy         StockExpiryPolicy?
+  stockExpiryAlerts         StockExpiryAlert[]
+  stockExpiryWriteOffs      StockExpiryWriteOff[]
+  reportSchedules           ReportSchedule[]
+  reportRuns                ReportRun[]
+  alertRules                AlertRule[]
+  communicationWebhooks     CommunicationWebhook[]
+  communicationOutboxEvents CommunicationOutboxEvent[]
+  communicationDeliveryAttempts CommunicationDeliveryAttempt[]
+  subscription                  OrganizationSubscription?
+  billingOverride               OrganizationBillingOverride?
+  billingInvoices               BillingInvoice[]
+  billingPaymentTransactions    BillingPaymentTransaction[]
+  platformBillingAudits         PlatformBillingAuditLog[]
 
   @@map("organization")
 }
@@ -290,10 +311,15 @@ model Item {
   currency           String         @default("USD")
   salePriceCents     Int            @default(0)
   costPriceCents     Int            @default(0)
-  trackInventory     Boolean        @default(true)
-  allowNegativeStock Boolean        @default(false)
-  reorderPoint       Int?
-  isBundle           Boolean             @default(false)
+  trackInventory        Boolean             @default(true)
+  allowNegativeStock    Boolean             @default(false)
+  reorderPoint          Int?
+  trackExpiry           Boolean             @default(false)
+  shelfLifeDays         Int?
+  expiryWarningDays     Int?
+  expiryCriticalDays    Int?
+  lotAllocationStrategy LotAllocationStrategy @default(FEFO)
+  isBundle              Boolean             @default(false)
   variantKind        ItemVariantKind     @default(STANDARD)
   parentItemId       String?
   parentItem         Item?               @relation("ItemVariantHierarchy", fields: [parentItemId], references: [id], onDelete: Restrict)
@@ -339,6 +365,8 @@ model Item {
   productionBatchesAsFinished ProductionBatch[]               @relation("BatchFinishedItem")
   materialReservationsAsItem  ProductionMaterialReservation[] @relation("ReservationItem")
   productionConsumptions      ProductionConsumption[]         @relation("ConsumptionItem")
+  stockExpiryAlerts           StockExpiryAlert[]
+  stockExpiryWriteOffs        StockExpiryWriteOff[]
 
   @@unique([organizationId, sku])
   @@unique([organizationId, parentItemId, variantKey])
@@ -391,6 +419,7 @@ enum StockMovementType {
   SALE_RETURN
   PRODUCTION_CONSUMPTION
   PRODUCTION_OUTPUT
+  EXPIRY_WRITEOFF
 }
 
 enum LotAllocationStrategy {
@@ -450,6 +479,8 @@ model Location {
   productionBatches      ProductionBatch[]
   productionReservations ProductionMaterialReservation[]
   productionConsumptions ProductionConsumption[]
+  stockExpiryAlerts      StockExpiryAlert[]
+  stockExpiryWriteOffs   StockExpiryWriteOff[]
 
   @@unique([organizationId, code])
   @@index([organizationId, status, type])
@@ -485,6 +516,8 @@ model StockMovement {
   type           StockMovementType
   quantityDelta  Int
   balanceAfter   Int
+  stockLotId     String?
+  stockLot       StockLot?         @relation(fields: [stockLotId], references: [id], onDelete: SetNull)
   referenceType  String?
   referenceId    String?
   reason         String?
@@ -492,6 +525,7 @@ model StockMovement {
   createdAt      DateTime          @default(now())
 
   @@index([organizationId, itemId, locationId, createdAt])
+  @@index([organizationId, stockLotId])
   @@index([organizationId, createdAt])
   @@map("stock_movement")
 }
@@ -869,6 +903,9 @@ model StockLot {
   productionConsumptions ProductionConsumption[]
   productionReservations ProductionMaterialReservation[]
   producedFromBatches    ProductionBatch[]               @relation("OutputStockLot")
+  stockMovements         StockMovement[]
+  expiryAlerts           StockExpiryAlert[]
+  expiryWriteOffs        StockExpiryWriteOff[]
 
   @@index([organizationId, itemId, locationId])
   @@index([organizationId, lotNumber])
@@ -1026,6 +1063,7 @@ enum StorageEntityType {
   ORDER
   SALES_INVOICE
   PAYMENT_RECEIPT
+  REPORT_RUN
 }
 
 enum AttachmentDocumentType {
@@ -2123,6 +2161,8 @@ enum CommunicationChannel {
   SMS
   WHATSAPP
   EMAIL
+  WEBHOOK
+  IN_APP
 }
 
 enum NotificationEventType {
@@ -3371,4 +3411,572 @@ model ItemVariantAttribute {
   @@index([organizationId, variantItemId])
   @@map("item_variant_attribute")
 }
+
+// ==========================================
+// Stock Expiry Tracking, Reporting & Communication Dispatch Outbox
+// ==========================================
+
+enum ExpiryEnforcementMode {
+  BLOCK_EXPIRED
+  WARN_ONLY
+}
+
+enum ExpiryAlertSeverity {
+  WARNING
+  CRITICAL
+  EXPIRED
+}
+
+enum ExpiryAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportDomain {
+  INVENTORY_EXPIRY
+  SALES_MPESA
+  PROCUREMENT_CLAIMS
+  PRODUCTION_COSTING
+}
+
+enum ReportFormat {
+  JSON
+  CSV
+  PDF
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ReportRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum CommunicationEventType {
+  STOCK_EXPIRY_WARNING
+  STOCK_EXPIRY_CRITICAL
+  STOCK_EXPIRED
+  STOCK_AUTO_QUARANTINED
+  STOCK_EXPIRY_WRITEOFF
+  SCHEDULED_REPORT_READY
+  ON_DEMAND_REPORT_DISPATCH
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum OutboxDeliveryStatus {
+  PENDING
+  PROCESSING
+  DISPATCHED
+  PARTIAL
+  FAILED
+  ACKNOWLEDGED
+  CANCELLED
+}
+
+model StockExpiryPolicy {
+  id                           String                @id @default(cuid())
+  organizationId               String                @unique
+  organization                 Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warningDays                  Int                   @default(30)
+  criticalDays                 Int                   @default(7)
+  enforcementMode              ExpiryEnforcementMode @default(BLOCK_EXPIRED)
+  autoQuarantineExpired        Boolean               @default(false)
+  autoQuarantineOnCriticalDays Int?
+  scanIntervalMinutes          Int                   @default(60)
+  isScannerActive              Boolean               @default(true)
+  lastScannedAt                DateTime?
+  lastScanSummary              Json?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+
+  @@map("stock_expiry_policy")
+}
+
+model StockExpiryAlert {
+  id                   String              @id @default(cuid())
+  organizationId       String
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockLotId           String
+  stockLot             StockLot            @relation(fields: [stockLotId], references: [id], onDelete: Cascade)
+  itemId               String
+  item                 Item                @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  locationId           String
+  location             Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  severity             ExpiryAlertSeverity
+  status               ExpiryAlertStatus   @default(OPEN)
+  dedupeKey            String
+  expiresAt            DateTime
+  daysUntilExpiry      Int
+  quantityAtRisk       Int
+  valueAtRiskCents     Int
+  outboxEventId        String?
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?
+  resolvedAt           DateTime?
+  resolvedByUserId     String?
+  resolutionNotes      String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, status, severity, expiresAt])
+  @@index([organizationId, stockLotId])
+  @@index([organizationId, itemId, locationId])
+  @@map("stock_expiry_alert")
+}
+
+model StockExpiryWriteOff {
+  id                 String         @id @default(cuid())
+  organizationId     String
+  organization       Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  writeOffNumber     String
+  stockLotId         String
+  stockLot           StockLot       @relation(fields: [stockLotId], references: [id], onDelete: Restrict)
+  itemId             String
+  item               Item           @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  locationId         String
+  location           Location       @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  stockMovementId    String?
+  quantity           Int
+  unitCostCents      Int
+  totalLossCents     Int
+  reason             String
+  disposalMethod     String?
+  notes              String?
+  writtenOffByUserId String?
+  writtenOffAt       DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+
+  @@unique([organizationId, writeOffNumber])
+  @@index([organizationId, writtenOffAt])
+  @@index([organizationId, itemId, locationId])
+  @@map("stock_expiry_write_off")
+}
+
+model ReportSchedule {
+  id              String                 @id @default(cuid())
+  organizationId  String
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  domain          ReportDomain
+  format          ReportFormat           @default(PDF)
+  frequency       ReportFrequency        @default(WEEKLY)
+  cronHourUtc     Int                    @default(6)
+  dayOfWeek       Int?
+  dayOfMonth      Int?
+  filters         Json?
+  recipientEmails String[]               @default([])
+  channelHints    CommunicationChannel[] @default([EMAIL])
+  isActive        Boolean                @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  runs            ReportRun[]
+
+  @@index([organizationId, isActive, nextRunAt])
+  @@index([isActive, nextRunAt])
+  @@map("report_schedule")
+}
+
+model ReportRun {
+  id                String          @id @default(cuid())
+  organizationId    String
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scheduleId        String?
+  schedule          ReportSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  domain            ReportDomain
+  format            ReportFormat
+  status            ReportRunStatus @default(COMPLETED)
+  filters           Json?
+  summaryKpis       Json?
+  rowCount          Int             @default(0)
+  storedObjectId    String?
+  outboxEventId     String?
+  durationMs        Int             @default(0)
+  errorMessage      String?
+  triggeredByUserId String?
+  startedAt         DateTime        @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+
+  @@index([organizationId, domain, createdAt])
+  @@index([organizationId, scheduleId, createdAt])
+  @@map("report_run")
+}
+
+model AlertRule {
+  id              String                 @id @default(cuid())
+  organizationId  String
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  eventType       CommunicationEventType
+  isActive        Boolean                @default(true)
+  channels        CommunicationChannel[] @default([EMAIL])
+  recipientRoles  String[]               @default(["owner", "admin", "manager"])
+  recipientEmails String[]               @default([])
+  webhookIds      String[]               @default([])
+  cooldownMinutes Int                    @default(1440)
+  lastTriggeredAt DateTime?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([organizationId, eventType, isActive])
+  @@map("alert_rule")
+}
+
+model CommunicationWebhook {
+  id                     String                   @id @default(cuid())
+  organizationId         String
+  organization           Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                   String
+  url                    String
+  eventTypes             CommunicationEventType[] @default([])
+  signingSecretEncrypted String
+  signingSecretHint      String
+  isActive               Boolean                  @default(true)
+  failureCount           Int                      @default(0)
+  lastSuccessAt          DateTime?
+  lastFailureAt          DateTime?
+  lastError              String?
+  createdByUserId        String?
+  updatedByUserId        String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+
+  @@index([organizationId, isActive])
+  @@map("communication_webhook")
+}
+
+model CommunicationOutboxEvent {
+  id                   String                        @id @default(cuid())
+  organizationId       String
+  organization         Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventType            CommunicationEventType
+  severity             AlertSeverity                 @default(INFO)
+  sourceEntityType     String?
+  sourceEntityId       String?
+  dedupeKey            String?
+  channelHints         CommunicationChannel[]        @default([])
+  targetRoles          String[]                      @default([])
+  targetEmails         String[]                      @default([])
+  targetWebhookIds     String[]                      @default([])
+  subject              String
+  summaryText          String
+  payload              Json
+  deliveryStatus       OutboxDeliveryStatus          @default(PENDING)
+  attemptCount         Int                           @default(0)
+  maxAttempts          Int                           @default(5)
+  nextRetryAt          DateTime?
+  lockedUntil          DateTime?
+  lockedBy             String?
+  dispatchedAt         DateTime?
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?
+  lastError            String?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  deliveryAttempts     CommunicationDeliveryAttempt[]
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, deliveryStatus, nextRetryAt])
+  @@index([deliveryStatus, nextRetryAt])
+  @@index([organizationId, eventType, createdAt])
+  @@map("communication_outbox_event")
+}
+
+model CommunicationDeliveryAttempt {
+  id                String                   @id @default(cuid())
+  organizationId    String
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outboxEventId     String
+  outboxEvent       CommunicationOutboxEvent @relation(fields: [outboxEventId], references: [id], onDelete: Cascade)
+  channel           CommunicationChannel
+  target            String
+  status            String
+  httpStatus        Int?
+  providerMessageId String?
+  errorMessage      String?
+  attemptedAt       DateTime                 @default(now())
+
+  @@index([organizationId, outboxEventId, attemptedAt])
+  @@map("communication_delivery_attempt")
+}
+
+// ==========================================
+// Platform SaaS Billing, Free Trials & System Admin Control
+// ==========================================
+
+enum SubscriptionBillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
+enum BillingSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  GRACE_PERIOD
+  PAST_DUE
+  EXPIRED
+  SUSPENDED
+  CANCELED
+}
+
+enum BillingInvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  WAIVED
+  VOID
+  FAILED
+}
+
+enum BillingPaymentMethod {
+  MPESA
+  ADMIN_MANUAL
+  ADMIN_WAIVER
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+model PlatformBillingConfig {
+  id                     String   @id @default("default")
+  autoTrialEnabled       Boolean  @default(true)
+  defaultTrialDays       Int      @default(14)
+  defaultGracePeriodDays Int      @default(7)
+  defaultCurrency        String   @default("KES")
+  taxRateBps             Int      @default(0)
+  mpesaEnabled           Boolean  @default(true)
+  allowMonthlyBilling    Boolean  @default(true)
+  allowAnnualBilling     Boolean  @default(true)
+  lockoutAfterGrace      Boolean  @default(true)
+  enforceQuotas          Boolean  @default(true)
+  enforceFeatureFlags    Boolean  @default(true)
+  billingSupportEmail    String?
+  updatedByUserId        String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("platform_billing_config")
+}
+
+model PlatformMpesaConfig {
+  id                          String             @id @default("default")
+  isEnabled                   Boolean            @default(false)
+  environment                 MpesaEnvironment   @default(LOCAL_SIMULATOR)
+  shortcodeType               MpesaShortcodeType @default(PAYBILL)
+  businessShortCode           String             @default("174379")
+  partyB                      String?
+  consumerKeyEncrypted        String?
+  consumerSecretEncrypted     String?
+  passkeyEncrypted            String?
+  callbackRouteTokenHash      String             @unique
+  callbackRouteTokenEncrypted String
+  callbackIpAllowlist         String[]           @default([])
+  accountReferencePrefix      String?            @default("SCACE")
+  transactionDescTemplate     String?            @default("Scace Subscription")
+  lastTestedAt                DateTime?
+  lastTestStatus              String?
+  updatedByUserId             String?
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime           @updatedAt
+
+  @@map("platform_mpesa_config")
+}
+
+model BillingPlan {
+  id                String                     @id @default(cuid())
+  code              String                     @unique
+  name              String
+  description       String?
+  isActive          Boolean                    @default(true)
+  isPublic          Boolean                    @default(true)
+  isDefaultTrial    Boolean                    @default(false)
+  sortOrder         Int                        @default(0)
+  currency          String                     @default("KES")
+  monthlyPriceCents Int                        @default(0)
+  annualPriceCents  Int                        @default(0)
+  trialDays         Int                        @default(14)
+  gracePeriodDays   Int                        @default(7)
+  maxMembers        Int?
+  maxLocations      Int?
+  maxItems          Int?
+  maxMonthlyOrders  Int?
+  maxStorageBytes   BigInt?
+  features          Json                       @default("{}")
+  createdByUserId   String?
+  updatedByUserId   String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  subscriptions     OrganizationSubscription[]
+  invoices          BillingInvoice[]
+
+  @@index([isActive, isPublic, sortOrder])
+  @@map("billing_plan")
+}
+
+model OrganizationSubscription {
+  id                    String                    @id @default(cuid())
+  organizationId        String                    @unique
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId                String
+  plan                  BillingPlan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  billingCycle          SubscriptionBillingCycle              @default(MONTHLY)
+  status                BillingSubscriptionStatus @default(TRIALING)
+  trialStartsAt         DateTime?
+  trialEndsAt           DateTime?
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  gracePeriodEndsAt     DateTime?
+  cancelAtPeriodEnd     Boolean                   @default(false)
+  canceledAt            DateTime?
+  suspendedAt           DateTime?
+  suspensionReason      String?
+  lockedAt              DateTime?
+  lastEnforcedStatus    BillingSubscriptionStatus?
+  lastStatusEvaluatedAt DateTime?
+  lastPaymentAt         DateTime?
+  metadata              Json?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([status, gracePeriodEndsAt])
+  @@index([planId])
+  @@map("organization_subscription")
+}
+
+model OrganizationBillingOverride {
+  id                       String                     @id @default(cuid())
+  organizationId           String                     @unique
+  organization             Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isActive                 Boolean                    @default(true)
+  exemptFromBilling        Boolean                    @default(false)
+  exemptUntil              DateTime?
+  forceStatus              BillingSubscriptionStatus?
+  forcePlanId              String?
+  customTrialEndsAt        DateTime?
+  customGracePeriodEndsAt  DateTime?
+  customMaxMembers         Int?
+  customMaxLocations       Int?
+  customMaxItems           Int?
+  customMaxMonthlyOrders   Int?
+  customMaxStorageBytes    BigInt?
+  discountPercent          Int?
+  allowMpesaOverride       Boolean?
+  featureOverrides         Json?
+  reason                   String?
+  notes                    String?
+  createdByUserId          String?
+  updatedByUserId          String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+
+  @@map("organization_billing_override")
+}
+
+model BillingInvoice {
+  id                  String                      @id @default(cuid())
+  invoiceNumber       String                      @unique
+  organizationId      String
+  organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId              String
+  plan                BillingPlan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
+  billingCycle        SubscriptionBillingCycle
+  currency            String
+  subtotalCents       Int
+  discountCents       Int                         @default(0)
+  taxCents            Int                         @default(0)
+  totalCents          Int
+  amountPaidCents     Int                         @default(0)
+  status              BillingInvoiceStatus        @default(OPEN)
+  periodStart         DateTime
+  periodEnd           DateTime
+  dueAt               DateTime
+  paidAt              DateTime?
+  waivedAt            DateTime?
+  waivedByUserId      String?
+  waivedReason        String?
+  notes               String?
+  createdByUserId     String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  paymentTransactions BillingPaymentTransaction[]
+
+  @@index([organizationId, status, createdAt])
+  @@map("billing_invoice")
+}
+
+model BillingPaymentTransaction {
+  id                 String               @id @default(cuid())
+  referenceNumber    String               @unique
+  organizationId     String
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId          String
+  invoice            BillingInvoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  method             BillingPaymentMethod @default(MPESA)
+  status             BillingPaymentStatus @default(PENDING)
+  currency           String
+  amountCents        Int
+  phoneNumber        String?
+  accountReference   String?
+  callbackToken      String?              @unique
+  merchantRequestId  String?
+  checkoutRequestId  String?              @unique
+  mpesaReceiptNumber String?              @unique
+  resultCode         String?
+  resultDesc         String?
+  initiatedByUserId  String?
+  processedAt        DateTime?
+  rawCallbackPayload Json?
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([organizationId, status, createdAt])
+  @@index([invoiceId, status])
+  @@map("billing_payment_transaction")
+}
+
+model PlatformBillingAuditLog {
+  id             String        @id @default(cuid())
+  actorUserId    String?
+  actorUser      User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  action         String
+  resourceType   String
+  resourceId     String?
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("platform_billing_audit_log")
+}
+
+
 

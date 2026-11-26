@@ -13,6 +13,8 @@ import { TenantInterceptor } from "./tenant.interceptor.js";
 
 export const TENANT_ROLES_KEY = "scace:tenant_roles";
 export const TENANT_PERMISSIONS_KEY = "scace:tenant_permissions";
+export const BILLING_LOCK_EXEMPT_KEY = "scace:billing_lock_exempt";
+export const BILLING_FEATURE_KEY = "scace:billing_feature";
 
 export interface AuthContextMetadata {
   authMethod: "COOKIE_SESSION" | "BEARER_SESSION" | "PAT" | "OAUTH2_ACCESS_TOKEN";
@@ -53,6 +55,18 @@ export type TenantScopedRequest = FastifyRequest & {
   };
   authContext?: AuthContextMetadata;
   tenant?: AuthenticatedTenant;
+  billing?: {
+    status: string;
+    planCode: string;
+    planId: string;
+    isLockedOut: boolean;
+    inGracePeriod: boolean;
+    isExempt: boolean;
+    trialEndsAt: string | null;
+    gracePeriodEndsAt: string | null;
+    currentPeriodEnd: string | null;
+    features: Record<string, boolean>;
+  };
 };
 
 export const RequiredOrgRoles = (...roles: string[]) =>
@@ -61,6 +75,12 @@ export const RequiredOrgRoles = (...roles: string[]) =>
 export const RequiredOrgPermissions = (
   permissions: OrgPermissionRequirement,
 ) => SetMetadata(TENANT_PERMISSIONS_KEY, permissions);
+
+export const AllowWhenBillingLocked = () =>
+  SetMetadata(BILLING_LOCK_EXEMPT_KEY, true);
+
+export const RequiredBillingFeature = (feature: string) =>
+  SetMetadata(BILLING_FEATURE_KEY, feature);
 
 export const RequireActiveTenant = () =>
   applyDecorators(UseGuards(TenantGuard), UseInterceptors(TenantInterceptor));

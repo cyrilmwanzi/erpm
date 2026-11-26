@@ -4,15 +4,18 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   ItemStatus,
   ItemType,
   ItemVariantKind,
+  LotAllocationStrategy,
   Prisma,
   TenantContext,
   type Item,
 } from "@scace/db";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
@@ -30,6 +33,11 @@ export interface CreateItemInput {
   trackInventory?: boolean;
   allowNegativeStock?: boolean;
   reorderPoint?: number | null;
+  trackExpiry?: boolean;
+  shelfLifeDays?: number | null;
+  expiryWarningDays?: number | null;
+  expiryCriticalDays?: number | null;
+  lotAllocationStrategy?: LotAllocationStrategy;
   isBundle?: boolean;
   variantKind?: "STANDARD" | "TEMPLATE";
   tags?: string[];
@@ -50,6 +58,11 @@ export interface UpdateItemInput {
   trackInventory?: boolean;
   allowNegativeStock?: boolean;
   reorderPoint?: number | null;
+  trackExpiry?: boolean;
+  shelfLifeDays?: number | null;
+  expiryWarningDays?: number | null;
+  expiryCriticalDays?: number | null;
+  lotAllocationStrategy?: LotAllocationStrategy;
   isBundle?: boolean;
   tags?: string[];
   metadata?: Record<string, unknown> | null;
@@ -143,6 +156,9 @@ export class ItemsService {
   constructor(
     @Inject(PrismaService) private readonly prismaService: PrismaService,
     @Inject(RedisService) private readonly redisService: RedisService,
+    @Optional()
+    @Inject(BillingEnforcementService)
+    private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
   async createItem(
@@ -151,6 +167,10 @@ export class ItemsService {
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
+    await this.billingEnforcement?.assertQuotaAvailable(
+      organizationId,
+      "maxItems",
+    );
     const variantKind =
       input.variantKind === ItemVariantKind.TEMPLATE
         ? ItemVariantKind.TEMPLATE
@@ -178,7 +198,28 @@ export class ItemsService {
           "reorderPoint cannot be set when trackInventory is false.",
         );
       }
+      if (input.trackExpiry === true) {
+        throw new BadRequestException(
+          "trackExpiry cannot be enabled when trackInventory is false.",
+        );
+      }
     }
+
+    const trackExpiry = trackInventory ? (input.trackExpiry ?? false) : false;
+    const shelfLifeDays = input.shelfLifeDays ?? null;
+    const expiryWarningDays = input.expiryWarningDays ?? null;
+    const expiryCriticalDays = input.expiryCriticalDays ?? null;
+    if (
+      expiryWarningDays !== null &&
+      expiryCriticalDays !== null &&
+      expiryCriticalDays > expiryWarningDays
+    ) {
+      throw new BadRequestException(
+        "expiryCriticalDays cannot exceed expiryWarningDays.",
+      );
+    }
+    const lotAllocationStrategy =
+      input.lotAllocationStrategy ?? LotAllocationStrategy.FEFO;
 
     const normalizedTags = normalizeTags(input.tags);
     const normalizedMetadata = input.metadata ?? null;
@@ -220,6 +261,11 @@ export class ItemsService {
             trackInventory,
             allowNegativeStock,
             reorderPoint,
+            trackExpiry,
+            shelfLifeDays,
+            expiryWarningDays,
+            expiryCriticalDays,
+            lotAllocationStrategy,
             isBundle: input.isBundle ?? false,
             variantKind,
             tags: normalizedTags,
@@ -243,6 +289,11 @@ export class ItemsService {
           trackInventory: { from: null, to: item.trackInventory },
           allowNegativeStock: { from: null, to: item.allowNegativeStock },
           reorderPoint: { from: null, to: item.reorderPoint },
+          trackExpiry: { from: null, to: item.trackExpiry },
+          shelfLifeDays: { from: null, to: item.shelfLifeDays },
+          expiryWarningDays: { from: null, to: item.expiryWarningDays },
+          expiryCriticalDays: { from: null, to: item.expiryCriticalDays },
+          lotAllocationStrategy: { from: null, to: item.lotAllocationStrategy },
           isBundle: { from: null, to: item.isBundle },
           variantKind: { from: null, to: item.variantKind },
           tags: { from: null, to: item.tags },
@@ -442,6 +493,29 @@ export class ItemsService {
               "reorderPoint cannot be set when trackInventory is false.",
             );
           }
+          if (input.trackExpiry === true) {
+            throw new BadRequestException(
+              "trackExpiry cannot be enabled when trackInventory is false.",
+            );
+          }
+        }
+
+        const nextExpiryWarningDays =
+          input.expiryWarningDays !== undefined
+            ? input.expiryWarningDays
+            : existing.expiryWarningDays;
+        const nextExpiryCriticalDays =
+          input.expiryCriticalDays !== undefined
+            ? input.expiryCriticalDays
+            : existing.expiryCriticalDays;
+        if (
+          nextExpiryWarningDays !== null &&
+          nextExpiryCriticalDays !== null &&
+          nextExpiryCriticalDays > nextExpiryWarningDays
+        ) {
+          throw new BadRequestException(
+            "expiryCriticalDays cannot exceed expiryWarningDays.",
+          );
         }
 
         const nextValues: {
@@ -457,6 +531,11 @@ export class ItemsService {
           trackInventory: boolean;
           allowNegativeStock: boolean;
           reorderPoint: number | null;
+          trackExpiry: boolean;
+          shelfLifeDays: number | null;
+          expiryWarningDays: number | null;
+          expiryCriticalDays: number | null;
+          lotAllocationStrategy: LotAllocationStrategy;
           isBundle: boolean;
           tags: string[];
           metadata: Prisma.JsonValue | null;
@@ -494,6 +573,21 @@ export class ItemsService {
             : input.reorderPoint !== undefined
               ? input.reorderPoint
               : existing.reorderPoint,
+          trackExpiry: !nextTrackInventory
+            ? false
+            : input.trackExpiry !== undefined
+              ? input.trackExpiry
+              : existing.trackExpiry,
+          shelfLifeDays:
+            input.shelfLifeDays !== undefined
+              ? input.shelfLifeDays
+              : existing.shelfLifeDays,
+          expiryWarningDays: nextExpiryWarningDays,
+          expiryCriticalDays: nextExpiryCriticalDays,
+          lotAllocationStrategy:
+            input.lotAllocationStrategy !== undefined
+              ? input.lotAllocationStrategy
+              : existing.lotAllocationStrategy,
           isBundle:
             input.isBundle !== undefined ? input.isBundle : existing.isBundle,
           tags:
@@ -520,6 +614,11 @@ export class ItemsService {
           "trackInventory",
           "allowNegativeStock",
           "reorderPoint",
+          "trackExpiry",
+          "shelfLifeDays",
+          "expiryWarningDays",
+          "expiryCriticalDays",
+          "lotAllocationStrategy",
           "isBundle",
           "tags",
           "metadata",

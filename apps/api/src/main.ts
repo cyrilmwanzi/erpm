@@ -42,7 +42,12 @@ async function bootstrap() {
       "X-API-Key",
       "X-Request-Id",
     ],
-    exposedHeaders: ["X-Request-Id"],
+    exposedHeaders: [
+      "X-Request-Id",
+      "X-Scace-Billing-Status",
+      "X-Scace-Grace-Ends-At",
+      "X-Scace-Plan-Code",
+    ],
   });
 
   await app.register(multipart, {

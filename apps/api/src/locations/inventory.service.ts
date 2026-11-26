@@ -29,6 +29,10 @@ import {
   STORED_OBJECT_SUMMARY_SELECT,
 } from "../storage/attachments.service.js";
 import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import {
+  allocateAndDeductLotsInTx,
+  recordAllocatedStockMovementsInTx,
+} from "./lot-allocation.utils.js";
 
 export interface ListBalancesQuery {
   locationId?: string;
@@ -1036,34 +1040,48 @@ export class InventoryService {
           );
         }
 
-        const updatedBalance = bal
-          ? await tx.stockBalance.update({
-              where: { id: bal.id },
-              data: { onHandQty: nextQty },
-            })
-          : await tx.stockBalance.create({
-              data: {
-                organizationId,
-                itemId: line.itemId,
-                locationId: existing.fromLocationId,
-                onHandQty: nextQty,
-                reservedQty: 0,
-              },
-            });
+        const allocation = await allocateAndDeductLotsInTx(tx, {
+          organizationId,
+          itemId: line.itemId,
+          sku: line.item.sku,
+          trackExpiry: line.item.trackExpiry,
+          allowNegativeStock: line.item.allowNegativeStock,
+          lotAllocationStrategy: line.item.lotAllocationStrategy,
+          locationId: existing.fromLocationId,
+          locationCode: existing.fromLocation.code,
+          currentBalanceOnHand: currentQty,
+          baseQty: line.quantity,
+        });
 
-        await tx.stockMovement.create({
-          data: {
-            organizationId,
-            itemId: line.itemId,
-            locationId: existing.fromLocationId,
-            type: StockMovementType.TRANSFER_OUT,
-            quantityDelta: -line.quantity,
-            balanceAfter: updatedBalance.onHandQty,
-            referenceType: "StockTransfer",
-            referenceId: existing.id,
-            reason: `Dispatched transfer ${existing.transferNumber} to ${existing.toLocation.code}`,
-            actorUserId: tenant.userId,
-          },
+        if (bal) {
+          await tx.stockBalance.update({
+            where: { id: bal.id },
+            data: { onHandQty: nextQty },
+          });
+        } else {
+          await tx.stockBalance.create({
+            data: {
+              organizationId,
+              itemId: line.itemId,
+              locationId: existing.fromLocationId,
+              onHandQty: nextQty,
+              reservedQty: 0,
+            },
+          });
+        }
+
+        await recordAllocatedStockMovementsInTx(tx, {
+          organizationId,
+          itemId: line.itemId,
+          locationId: existing.fromLocationId,
+          type: StockMovementType.TRANSFER_OUT,
+          startingBalanceOnHand: currentQty,
+          usedLots: allocation.usedLots,
+          unlottedQty: allocation.unlottedQty,
+          referenceType: "StockTransfer",
+          referenceId: existing.id,
+          reason: `Dispatched transfer ${existing.transferNumber} to ${existing.toLocation.code}`,
+          actorUserId: tenant.userId,
         });
       }
 
@@ -1153,7 +1171,18 @@ export class InventoryService {
       }
 
       for (const line of existing.lines) {
-        const bal = await tx.stockBalance.upsert({
+        const previousBal = await tx.stockBalance.findUnique({
+          where: {
+            organizationId_itemId_locationId: {
+              organizationId,
+              itemId: line.itemId,
+              locationId: existing.toLocationId,
+            },
+          },
+        });
+        let runningBal = previousBal?.onHandQty ?? 0;
+
+        await tx.stockBalance.upsert({
           where: {
             organizationId_itemId_locationId: {
               organizationId,
@@ -1173,20 +1202,107 @@ export class InventoryService {
           },
         });
 
-        await tx.stockMovement.create({
-          data: {
+        const outboundMovements = await tx.stockMovement.findMany({
+          where: {
             organizationId,
             itemId: line.itemId,
-            locationId: existing.toLocationId,
-            type: StockMovementType.TRANSFER_IN,
-            quantityDelta: line.quantity,
-            balanceAfter: bal.onHandQty,
+            locationId: existing.fromLocationId,
+            type: StockMovementType.TRANSFER_OUT,
             referenceType: "StockTransfer",
             referenceId: existing.id,
-            reason: `Received transfer ${existing.transferNumber} from ${existing.fromLocation.code}`,
-            actorUserId: tenant.userId,
+            stockLotId: { not: null },
           },
+          include: { stockLot: true },
+          orderBy: { createdAt: "asc" },
         });
+
+        let lotTransferredTotal = 0;
+        for (const outMov of outboundMovements) {
+          const srcLot = outMov.stockLot;
+          const moveQty = Math.abs(outMov.quantityDelta);
+          if (!srcLot || moveQty <= 0) {
+            continue;
+          }
+          lotTransferredTotal += moveQty;
+          runningBal += moveQty;
+
+          const existingDestLot = await tx.stockLot.findFirst({
+            where: {
+              organizationId,
+              itemId: line.itemId,
+              locationId: existing.toLocationId,
+              lotNumber: srcLot.lotNumber,
+            },
+          });
+
+          const destLot = existingDestLot
+            ? await tx.stockLot.update({
+                where: { id: existingDestLot.id },
+                data: {
+                  onHandQty: { increment: moveQty },
+                  initialQty: { increment: moveQty },
+                  ...(srcLot.expiresAt && !existingDestLot.expiresAt
+                    ? { expiresAt: srcLot.expiresAt }
+                    : {}),
+                },
+              })
+            : await tx.stockLot.create({
+                data: {
+                  organizationId,
+                  itemId: line.itemId,
+                  locationId: existing.toLocationId,
+                  supplierId: srcLot.supplierId,
+                  supplierItemId: srcLot.supplierItemId,
+                  supplierSku: srcLot.supplierSku,
+                  supplierBatchNumber: srcLot.supplierBatchNumber,
+                  goodsReceiptLineId: srcLot.goodsReceiptLineId,
+                  lotNumber: srcLot.lotNumber,
+                  batchCode: srcLot.batchCode,
+                  manufacturedAt: srcLot.manufacturedAt,
+                  expiresAt: srcLot.expiresAt,
+                  initialQty: moveQty,
+                  onHandQty: moveQty,
+                  quarantinedQty: 0,
+                  consumedQty: 0,
+                  unitCostCents: srcLot.unitCostCents,
+                },
+              });
+
+          await tx.stockMovement.create({
+            data: {
+              organizationId,
+              itemId: line.itemId,
+              locationId: existing.toLocationId,
+              type: StockMovementType.TRANSFER_IN,
+              quantityDelta: moveQty,
+              balanceAfter: runningBal,
+              stockLotId: destLot.id,
+              referenceType: "StockTransfer",
+              referenceId: existing.id,
+              reason: `Received transfer ${existing.transferNumber} from ${existing.fromLocation.code} [Lot ${destLot.lotNumber}]`,
+              actorUserId: tenant.userId,
+            },
+          });
+        }
+
+        const unlottedRemainder = Math.max(0, line.quantity - lotTransferredTotal);
+        if (unlottedRemainder > 0) {
+          runningBal += unlottedRemainder;
+          await tx.stockMovement.create({
+            data: {
+              organizationId,
+              itemId: line.itemId,
+              locationId: existing.toLocationId,
+              type: StockMovementType.TRANSFER_IN,
+              quantityDelta: unlottedRemainder,
+              balanceAfter: runningBal,
+              referenceType: "StockTransfer",
+              referenceId: existing.id,
+              reason: `Received transfer ${existing.transferNumber} from ${existing.fromLocation.code}`,
+              actorUserId: tenant.userId,
+            },
+          });
+        }
       }
 
       const received = await tx.stockTransfer.findFirstOrThrow({

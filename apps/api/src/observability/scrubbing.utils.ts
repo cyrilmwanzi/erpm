@@ -334,6 +334,8 @@ function defaultErrorCodeForStatus(statusCode: number): string {
       return "BAD_REQUEST";
     case HttpStatus.UNAUTHORIZED:
       return "UNAUTHORIZED";
+    case HttpStatus.PAYMENT_REQUIRED:
+      return "PAYMENT_REQUIRED";
     case HttpStatus.FORBIDDEN:
       return "FORBIDDEN";
     case HttpStatus.NOT_FOUND:

@@ -329,7 +329,18 @@ describe("M-Pesa Multi-Tenant Isolation, Callback Hardening & Settlement", () =>
           sku: "SKU-1",
           trackInventory: true,
           allowNegativeStock: false,
+          trackExpiry: false,
+          lotAllocationStrategy: "FEFO",
         }),
+      },
+      location: {
+        findFirst: async ({ where }: any) => ({
+          id: where.id,
+          code: "MAIN",
+        }),
+      },
+      stockLot: {
+        findMany: async () => [],
       },
       stockBalance: {
         findUnique: async ({ where }: any) => {

@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   PayloadTooLargeException,
 } from "@nestjs/common";
 import {
@@ -12,6 +13,7 @@ import {
   type Prisma,
   type StoredObject,
 } from "@scace/db";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
@@ -91,6 +93,9 @@ export class StorageService {
     @Inject(RustfsService) private readonly rustfsService: RustfsService,
     @Inject(AnalyticsService)
     private readonly analyticsService: AnalyticsService,
+    @Optional()
+    @Inject(BillingEnforcementService)
+    private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
   private serializeObject(obj: StoredObject): SerializedStoredObject {
@@ -141,9 +146,25 @@ export class StorageService {
     }
 
     const bucket = settings.storageBucket ?? expectedBucket;
-    const quotaBytes = Number(
+    let quotaBytes = Number(
       settings.storageQuotaBytes ?? BigInt(env.STORAGE_DEFAULT_QUOTA_BYTES),
     );
+
+    if (this.billingEnforcement) {
+      const entitlement =
+        await this.billingEnforcement.evaluateOrganizationEntitlement(
+          organizationId,
+        );
+      if (entitlement.isExempt) {
+        quotaBytes = Number.MAX_SAFE_INTEGER;
+      } else if (
+        entitlement.enforceQuotas &&
+        entitlement.limits.maxStorageBytes !== null &&
+        entitlement.limits.maxStorageBytes !== undefined
+      ) {
+        quotaBytes = entitlement.limits.maxStorageBytes;
+      }
+    }
 
     // Lock tenant settings row during quota-sensitive transactions on PostgreSQL
     await tx.$queryRaw`SELECT "id" FROM "tenant_settings" WHERE "organizationId" = ${organizationId} FOR UPDATE`;
@@ -256,6 +277,12 @@ export class StorageService {
         break;
       case StorageEntityType.PAYMENT_RECEIPT:
         found = await tx.paymentReceipt.findFirst({
+          where: { id: trimmedId, organizationId },
+          select: { id: true },
+        });
+        break;
+      case StorageEntityType.REPORT_RUN:
+        found = await tx.reportRun.findFirst({
           where: { id: trimmedId, organizationId },
           select: { id: true },
         });

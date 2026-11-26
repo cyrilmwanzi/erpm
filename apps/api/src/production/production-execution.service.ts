@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import {
   BomIssueMethod,
+  ExpiryAlertStatus,
+  ExpiryEnforcementMode,
   ItemStatus,
   ItemType,
   LocationStatus,
@@ -25,6 +27,7 @@ import {
 } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
+import { resolveEffectiveExpiryPolicyTx } from "../locations/lot-allocation.utils.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import {
   type BulkQuantityInput,
@@ -341,10 +344,20 @@ export class ProductionExecutionService {
       fieldLabel: `consumption for SKU "${item.sku}"`,
     });
 
+    const policy = await resolveEffectiveExpiryPolicyTx(tx, organizationId);
     const includeExpired = reqLine.includeExpired ?? false;
+    if (
+      includeExpired &&
+      policy.enforcementMode === ExpiryEnforcementMode.BLOCK_EXPIRED
+    ) {
+      throw new BadRequestException(
+        `Organization expiry policy (${policy.enforcementMode}) forbids consuming expired stock lots.`,
+      );
+    }
+
     let allocationStrategy: LotAllocationStrategy;
     const plan: Array<{
-      lot: { id: string; lotNumber: string; onHandQty: number };
+      lot: { id: string; lotNumber: string; onHandQty: number; quarantinedQty: number };
       takeQty: number;
     }> = [];
 
@@ -385,6 +398,7 @@ export class ProductionExecutionService {
           id: manualLot.id,
           lotNumber: manualLot.lotNumber,
           onHandQty: manualLot.onHandQty,
+          quarantinedQty: manualLot.quarantinedQty,
         },
         takeQty: normalized.totalBaseQty,
       });
@@ -392,7 +406,11 @@ export class ProductionExecutionService {
       allocationStrategy =
         reqLine.allocationStrategy === "FIFO"
           ? LotAllocationStrategy.FIFO
-          : LotAllocationStrategy.FEFO;
+          : reqLine.allocationStrategy === "FEFO"
+            ? LotAllocationStrategy.FEFO
+            : item.lotAllocationStrategy === LotAllocationStrategy.FIFO
+              ? LotAllocationStrategy.FIFO
+              : LotAllocationStrategy.FEFO;
 
       const candidateLots = await tx.stockLot.findMany({
         where: {
@@ -435,6 +453,7 @@ export class ProductionExecutionService {
               id: candidate.id,
               lotNumber: candidate.lotNumber,
               onHandQty: candidate.onHandQty,
+              quarantinedQty: candidate.quarantinedQty,
             },
             takeQty,
           });
@@ -509,6 +528,22 @@ export class ProductionExecutionService {
         );
       }
 
+      if (step.lot.onHandQty - step.takeQty === 0 && step.lot.quarantinedQty === 0) {
+        await tx.stockExpiryAlert.updateMany({
+          where: {
+            organizationId,
+            stockLotId: step.lot.id,
+            status: { in: [ExpiryAlertStatus.OPEN, ExpiryAlertStatus.ACKNOWLEDGED] },
+          },
+          data: {
+            status: ExpiryAlertStatus.RESOLVED,
+            resolvedAt: now,
+            resolvedByUserId: tenant.userId,
+            resolutionNotes: "Lot depleted in production consumption.",
+          },
+        });
+      }
+
       const unitCostCents = await resolveLotUnitCostCents(
         tx,
         organizationId,
@@ -572,6 +607,7 @@ export class ProductionExecutionService {
             type: StockMovementType.PRODUCTION_CONSUMPTION,
             quantityDelta: -step.takeQty,
             balanceAfter: updatedBal.onHandQty,
+            stockLotId: step.lot.id,
             referenceType: "ProductionBatch",
             referenceId: batch.id,
             reason: `Consumed ${step.takeQty} ${item.unitOfMeasure} from lot ${step.lot.lotNumber} in batch ${batch.batchNumber}`,

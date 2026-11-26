@@ -23,6 +23,7 @@ import { z } from "zod";
 import {
   CurrentTenant,
   RequireActiveTenant,
+  RequiredBillingFeature,
   RequiredOrgPermissions,
   type AuthenticatedTenant,
 } from "../tenancy/tenant.decorators.js";
@@ -202,6 +203,7 @@ const activateBodySchema = z.object({
 
 @Controller("api/v1/production")
 @RequireActiveTenant()
+@RequiredBillingFeature("production")
 export class ProductionEngineeringController {
   constructor(
     @Inject(ProductionEngineeringService)

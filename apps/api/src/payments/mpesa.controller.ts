@@ -23,6 +23,7 @@ import { z } from "zod";
 import {
   CurrentTenant,
   RequireActiveTenant,
+  RequiredBillingFeature,
   RequiredOrgPermissions,
   type AuthenticatedTenant,
 } from "../tenancy/tenant.decorators.js";
@@ -128,6 +129,7 @@ const simulateC2bSchema = z.object({
 
 @Controller("api/v1/payments/mpesa")
 @RequireActiveTenant()
+@RequiredBillingFeature("mpesa")
 export class MpesaController {
   constructor(
     @Inject(MpesaConfigService)

@@ -22,6 +22,7 @@ import {
 } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
+import { computeExpiresAtFromShelfLife } from "../locations/lot-allocation.utils.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import {
   type AttachmentInput,
@@ -1060,10 +1061,19 @@ export class DeliveriesService {
           Boolean(line.serialNumbers);
 
         if (
-          ((line.item.trackInventory || hasTraceability) &&
+          ((line.item.trackInventory || hasTraceability || line.item.trackExpiry) &&
             (line.acceptedBaseQty > 0 || effectiveQuarantinedBase > 0)) ||
           effectiveQuarantinedBase > 0
         ) {
+          const computedExpiresAt =
+            line.expiresAt ??
+            (line.item.trackExpiry
+              ? computeExpiresAtFromShelfLife(
+                  line.manufacturedAt ?? delivery.deliveredAt ?? new Date(),
+                  line.item.shelfLifeDays,
+                )
+              : null);
+
           const lot = await tx.stockLot.create({
             data: {
               organizationId,
@@ -1080,7 +1090,7 @@ export class DeliveriesService {
                 `${delivery.receiptNumber}-${line.item.sku}`.slice(0, 80),
               batchCode: line.batchCode ?? null,
               manufacturedAt: line.manufacturedAt ?? null,
-              expiresAt: line.expiresAt ?? null,
+              expiresAt: computedExpiresAt,
               serialNumbers:
                 line.serialNumbers === null
                   ? Prisma.DbNull
@@ -1150,6 +1160,7 @@ export class DeliveriesService {
               type: StockMovementType.RECEIPT,
               quantityDelta: line.acceptedBaseQty,
               balanceAfter: bal.onHandQty,
+              stockLotId,
               referenceType: "GoodsReceipt",
               referenceId: delivery.id,
               reason: `QC accepted delivery ${delivery.receiptNumber} for PO ${delivery.purchaseOrder.poNumber}${packText}`,
