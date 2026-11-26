@@ -19,9 +19,16 @@
     "db:generate": "pnpm --filter @scace/db db:generate",
     "db:push": "pnpm --filter @scace/db db:push",
     "db:migrate": "pnpm --filter @scace/db db:migrate",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "release:check": "node scripts/release.mjs check",
+    "release:version": "node scripts/release.mjs version",
+    "release": "node scripts/release.mjs run",
+    "release:publish-ci": "node scripts/release.mjs publish-ci",
     "clean": "pnpm --filter @scace/db clean && pnpm --filter @scace/api clean && rm -rf dist .turbo"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.3",
     "pnpm": "^12.23.0",
     "turbo": "^2.11.13",
     "typescript": "^7.0.2"

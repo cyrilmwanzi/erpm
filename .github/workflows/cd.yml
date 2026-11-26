@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags:
       - "v*"
+      - "@scace/api@*"
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -51,6 +52,7 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=match,pattern=@scace/api@(.*),group=1
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 

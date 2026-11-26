@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+  id-token: write
+
+jobs:
+  check-changesets:
+    name: Check Changeset Files
+    runs-on: ubuntu-latest
+    outputs:
+      has_changesets: ${{ steps.detect.outputs.has_changesets }}
+      consumed_changesets: ${{ steps.detect.outputs.consumed_changesets }}
+      should_release: ${{ steps.detect.outputs.should_release }}
+      changeset_files: ${{ steps.detect.outputs.changeset_files }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect pending or consumed changeset files
+        id: detect
+        run: node scripts/release.mjs check --github-commit
+
+  release:
+    name: Version, Tag & Release
+    needs: check-changesets
+    if: needs.check-changesets.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://scace:scace_ci_password@localhost:5432/scace_ci?schema=public
+      REDIS_URL: redis://localhost:6379
+      REDIS_KEY_PREFIX: "scace:"
+      BETTER_AUTH_SECRET: ci-only-secret-change-in-production-0123456789
+      BETTER_AUTH_URL: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Verify lint, typecheck, tests, and builds
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+          pnpm --filter @scace/sdk build
+          pnpm --filter @scace/sdk test
+
+      - name: Create Release Pull Request or Publish/Tag Releases
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm release:version
+          publish: pnpm release:publish-ci
+          title: "chore(release): version packages"
+          commit: "chore(release): version packages"
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
