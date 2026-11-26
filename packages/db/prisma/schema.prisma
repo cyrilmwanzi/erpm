@@ -159,8 +159,13 @@ model Organization {
   productionCostEntries   ProductionCostEntry[]
   productionConsumptions  ProductionConsumption[]
   productionReservations  ProductionMaterialReservation[]
-  mpesaConfiguration      MpesaConfiguration?
-  paymentTransactions     PaymentTransaction[]
+  mpesaConfiguration        MpesaConfiguration?
+  paymentTransactions       PaymentTransaction[]
+  variantOptions            VariantOption[]
+  variantOptionValues       VariantOptionValue[]
+  itemTemplateOptions       ItemTemplateOption[]
+  itemTemplateOptionValues  ItemTemplateOptionValue[]
+  itemVariantAttributes     ItemVariantAttribute[]
 
   @@map("organization")
 }
@@ -259,6 +264,19 @@ enum ItemRevisionAction {
   RESTORED
 }
 
+enum ItemVariantKind {
+  STANDARD
+  TEMPLATE
+  VARIANT
+}
+
+enum VariantOptionDisplayType {
+  SELECT
+  COLOR
+  SIZE
+  TEXT
+}
+
 model Item {
   id                 String         @id @default(cuid())
   organizationId     String
@@ -276,6 +294,14 @@ model Item {
   allowNegativeStock Boolean        @default(false)
   reorderPoint       Int?
   isBundle           Boolean             @default(false)
+  variantKind        ItemVariantKind     @default(STANDARD)
+  parentItemId       String?
+  parentItem         Item?               @relation("ItemVariantHierarchy", fields: [parentItemId], references: [id], onDelete: Restrict)
+  variants           Item[]              @relation("ItemVariantHierarchy")
+  variantKey         String?
+  inheritParentPricing Boolean           @default(true)
+  salePriceOverrideCents Int?
+  costPriceOverrideCents Int?
   tags               String[]            @default([])
   metadata           Json?
   version            Int                 @default(1)
@@ -285,6 +311,8 @@ model Item {
   archivedByUserId   String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  templateOptions    ItemTemplateOption[]    @relation("TemplateItemOptions")
+  variantAttributes  ItemVariantAttribute[]  @relation("VariantItemAttributes")
   revisions          ItemRevision[]
   stockBalances      StockBalance[]
   stockMovements     StockMovement[]
@@ -313,7 +341,10 @@ model Item {
   productionConsumptions      ProductionConsumption[]         @relation("ConsumptionItem")
 
   @@unique([organizationId, sku])
+  @@unique([organizationId, parentItemId, variantKey])
   @@index([organizationId, status, type])
+  @@index([organizationId, variantKind, status])
+  @@index([organizationId, parentItemId])
   @@index([organizationId, updatedAt])
   @@map("item")
 }
@@ -3239,3 +3270,105 @@ model PaymentTransaction {
   @@index([organizationId, accountReference])
   @@map("payment_transaction")
 }
+
+// ==========================================
+// Product Variant Options, Template Matrix & Attributes
+// ==========================================
+
+model VariantOption {
+  id                String                   @id @default(cuid())
+  organizationId    String
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code              String
+  name              String
+  displayType       VariantOptionDisplayType @default(SELECT)
+  sortOrder         Int                      @default(0)
+  isActive          Boolean                  @default(true)
+  metadata          Json?
+  createdByUserId   String?
+  updatedByUserId   String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  values            VariantOptionValue[]
+  templateOptions   ItemTemplateOption[]
+  variantAttributes ItemVariantAttribute[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive, sortOrder])
+  @@map("variant_option")
+}
+
+model VariantOptionValue {
+  id                   String                    @id @default(cuid())
+  organizationId       String
+  organization         Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  optionId             String
+  option               VariantOption             @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  code                 String
+  label                String
+  swatchHex            String?
+  sortOrder            Int                       @default(0)
+  isActive             Boolean                   @default(true)
+  metadata             Json?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  templateOptionValues ItemTemplateOptionValue[]
+  variantAttributes    ItemVariantAttribute[]
+
+  @@unique([organizationId, optionId, code])
+  @@index([organizationId, optionId, sortOrder])
+  @@map("variant_option_value")
+}
+
+model ItemTemplateOption {
+  id             String                    @id @default(cuid())
+  organizationId String
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateItemId String
+  templateItem   Item                      @relation("TemplateItemOptions", fields: [templateItemId], references: [id], onDelete: Cascade)
+  optionId       String
+  option         VariantOption             @relation(fields: [optionId], references: [id], onDelete: Restrict)
+  sortOrder      Int                       @default(0)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  allowedValues  ItemTemplateOptionValue[]
+
+  @@unique([organizationId, templateItemId, optionId])
+  @@index([organizationId, templateItemId, sortOrder])
+  @@map("item_template_option")
+}
+
+model ItemTemplateOptionValue {
+  id               String             @id @default(cuid())
+  organizationId   String
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateOptionId String
+  templateOption   ItemTemplateOption @relation(fields: [templateOptionId], references: [id], onDelete: Cascade)
+  optionValueId    String
+  optionValue      VariantOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Restrict)
+  sortOrder        Int                @default(0)
+  createdAt        DateTime           @default(now())
+
+  @@unique([organizationId, templateOptionId, optionValueId])
+  @@index([organizationId, templateOptionId, sortOrder])
+  @@map("item_template_option_value")
+}
+
+model ItemVariantAttribute {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  variantItemId  String
+  variantItem    Item               @relation("VariantItemAttributes", fields: [variantItemId], references: [id], onDelete: Cascade)
+  optionId       String
+  option         VariantOption      @relation(fields: [optionId], references: [id], onDelete: Restrict)
+  optionValueId  String
+  optionValue    VariantOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Restrict)
+  createdAt      DateTime           @default(now())
+
+  @@unique([organizationId, variantItemId, optionId])
+  @@index([organizationId, optionId, optionValueId])
+  @@index([organizationId, variantItemId])
+  @@map("item_variant_attribute")
+}
+

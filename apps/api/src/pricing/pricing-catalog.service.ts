@@ -274,15 +274,32 @@ export class PricingCatalogService {
 
     const item = await this.prismaService.scoped.item.findUnique({
       where: { id: itemId },
+      include: {
+        parentItem: true,
+        variantAttributes: {
+          include: {
+            option: { select: { id: true, code: true, name: true, displayType: true } },
+            optionValue: {
+              select: { id: true, code: true, label: true, swatchHex: true },
+            },
+          },
+        },
+      },
     });
     if (!item) {
       throw new NotFoundException("Catalog item was not found.");
     }
 
+    const parentId = item.parentItemId ?? null;
+    const lookupIds = parentId ? [itemId, parentId] : [itemId];
+    const mergedTags = Array.from(
+      new Set([...item.tags, ...(item.parentItem?.tags ?? [])]),
+    );
+
     const [packs, bundleComponents, servicePlans, priceRules, discountRules] =
       await Promise.all([
         this.prismaService.scoped.itemPack.findMany({
-          where: { organizationId, itemId },
+          where: { organizationId, itemId: { in: lookupIds } },
           orderBy: [{ unitsPerPack: "asc" }, { code: "asc" }],
         }),
         this.prismaService.scoped.itemBundleComponent.findMany({
@@ -317,7 +334,7 @@ export class PricingCatalogService {
           orderBy: { basePriceCents: "asc" },
         }),
         this.prismaService.scoped.priceRule.findMany({
-          where: { organizationId, itemId, isActive: true },
+          where: { organizationId, itemId: { in: lookupIds }, isActive: true },
           include: {
             priceBook: {
               select: {
@@ -341,21 +358,59 @@ export class PricingCatalogService {
             organizationId,
             isActive: true,
             OR: [
-              { targetItemId: itemId },
-              ...(item.tags.length > 0 ? [{ targetTags: { hasSome: item.tags } }] : []),
+              { targetItemId: { in: lookupIds } },
+              ...(mergedTags.length > 0 ? [{ targetTags: { hasSome: mergedTags } }] : []),
             ],
           },
           orderBy: { priority: "asc" },
         }),
       ]);
 
+    const ownPacks = packs.filter((p) => p.itemId === itemId);
+    const ownPackCodes = new Set(ownPacks.map((p) => p.code));
+    const inheritedPacks = parentId
+      ? packs.filter((p) => p.itemId === parentId && !ownPackCodes.has(p.code))
+      : [];
+
+    const ownPriceRules = priceRules.filter((r) => r.itemId === itemId);
+    const inheritedPriceRules =
+      parentId && item.inheritParentPricing
+        ? priceRules.filter((r) => r.itemId === parentId)
+        : [];
+
+    const effectiveSalePriceCents =
+      item.salePriceOverrideCents ??
+      (item.inheritParentPricing && item.parentItem
+        ? item.parentItem.salePriceCents
+        : item.salePriceCents);
+    const effectiveCostPriceCents =
+      item.costPriceOverrideCents ??
+      (item.inheritParentPricing && item.parentItem
+        ? item.parentItem.costPriceCents
+        : item.costPriceCents);
+
     return {
       organizationId,
       item,
-      packs,
+      effectivePricing: {
+        inheritParentPricing: item.inheritParentPricing,
+        salePriceCents: effectiveSalePriceCents,
+        costPriceCents: effectiveCostPriceCents,
+        salePriceInherited:
+          Boolean(parentId) &&
+          item.inheritParentPricing &&
+          item.salePriceOverrideCents === null,
+        costPriceInherited:
+          Boolean(parentId) &&
+          item.inheritParentPricing &&
+          item.costPriceOverrideCents === null,
+      },
+      packs: ownPacks,
+      inheritedPacks,
       bundleComponents,
       servicePlans,
-      priceRules,
+      priceRules: ownPriceRules,
+      inheritedPriceRules,
       discountRules,
     };
   }

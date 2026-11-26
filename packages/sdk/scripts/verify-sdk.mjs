@@ -105,6 +105,7 @@ for (const key of [
   "tenants",
   "invitations",
   "items",
+  "variants",
   "locations",
   "inventory",
   "pricing",
@@ -135,6 +136,22 @@ for (const key of [
   "system",
 ]) {
   assert.ok(key in sdk, `Missing namespace sdk.${key}`);
+}
+for (const variantKey of [
+  "createOption",
+  "listOptions",
+  "createTemplate",
+  "promoteToTemplate",
+  "configureTemplateOptions",
+  "previewMatrix",
+  "generateMatrix",
+  "createVariant",
+  "bulkUpdateVariants",
+  "resolveByAttributes",
+  "getVariant",
+  "updateVariant",
+]) {
+  assert.equal(typeof sdk.variants[variantKey], "function", `Missing sdk.variants.${variantKey}`);
 }
 for (const authKey of [
   "signUpWithEmail",

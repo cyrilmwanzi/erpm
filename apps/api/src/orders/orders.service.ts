@@ -9,6 +9,7 @@ import {
   CustomerPaymentStatus,
   CustomerStatus,
   ItemStatus,
+  ItemVariantKind,
   LocationStatus,
   OrderChannel,
   OrderStatus,
@@ -217,6 +218,15 @@ export class OrdersService {
       })),
     });
 
+    const templateLine = quote.lines.find(
+      (ql) => ql.variantKind === ItemVariantKind.TEMPLATE,
+    );
+    if (templateLine) {
+      throw new BadRequestException(
+        `Item "${templateLine.sku}" is a product template. Select a concrete variant SKU instead.`,
+      );
+    }
+
     const subtotalCents = quote.subtotalAfterTiersCents;
     const discountTotalCents = quote.totalDiscountCents;
     const taxCents = input.taxCents ?? 0;
@@ -297,6 +307,9 @@ export class OrdersService {
                       appliedTiers: ql.appliedTiers,
                       appliedDiscounts: ql.appliedDiscounts,
                       bundleBreakdown: ql.bundleBreakdown,
+                      parentItemId: ql.parentItemId,
+                      pricingInheritedFromParent: ql.pricingInheritedFromParent,
+                      variantAttributes: ql.variantAttributes,
                     } as unknown as Prisma.InputJsonValue,
                   };
                 }),
@@ -465,6 +478,9 @@ export class OrdersService {
                     appliedTiers: ql.appliedTiers,
                     appliedDiscounts: ql.appliedDiscounts,
                     bundleBreakdown: ql.bundleBreakdown,
+                    parentItemId: ql.parentItemId,
+                    pricingInheritedFromParent: ql.pricingInheritedFromParent,
+                    variantAttributes: ql.variantAttributes,
                   } as unknown as Prisma.InputJsonValue,
                 };
               }),
@@ -692,6 +708,15 @@ export class OrdersService {
       })),
     });
 
+    const templateLine = quote.lines.find(
+      (ql) => ql.variantKind === ItemVariantKind.TEMPLATE,
+    );
+    if (templateLine) {
+      throw new BadRequestException(
+        `Item "${templateLine.sku}" is a product template. Select a concrete variant SKU instead.`,
+      );
+    }
+
     const subtotalCents = quote.subtotalAfterTiersCents;
     const discountTotalCents = quote.totalDiscountCents;
     const taxCents = input.taxCents ?? 0;
@@ -756,6 +781,9 @@ export class OrdersService {
                   appliedTiers: ql.appliedTiers,
                   appliedDiscounts: ql.appliedDiscounts,
                   bundleBreakdown: ql.bundleBreakdown,
+                  parentItemId: ql.parentItemId,
+                  pricingInheritedFromParent: ql.pricingInheritedFromParent,
+                  variantAttributes: ql.variantAttributes,
                 } as unknown as Prisma.InputJsonValue,
               })),
             },
@@ -899,6 +927,15 @@ export class OrdersService {
       })),
     });
 
+    const templateLine = quote.lines.find(
+      (ql) => ql.variantKind === ItemVariantKind.TEMPLATE,
+    );
+    if (templateLine) {
+      throw new BadRequestException(
+        `Item "${templateLine.sku}" is a product template. Select a concrete variant SKU instead.`,
+      );
+    }
+
     const subtotalCents = quote.subtotalAfterTiersCents;
     const discountTotalCents = quote.totalDiscountCents;
     const taxCents = input.taxCents !== undefined ? input.taxCents : existing.taxCents;
@@ -968,6 +1005,9 @@ export class OrdersService {
                 appliedTiers: ql.appliedTiers,
                 appliedDiscounts: ql.appliedDiscounts,
                 bundleBreakdown: ql.bundleBreakdown,
+                parentItemId: ql.parentItemId,
+                pricingInheritedFromParent: ql.pricingInheritedFromParent,
+                variantAttributes: ql.variantAttributes,
               } as unknown as Prisma.InputJsonValue,
             })),
           },

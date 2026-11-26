@@ -8,6 +8,7 @@ import {
 import {
   GoodsReceiptStatus,
   ItemStatus,
+  ItemVariantKind,
   LocationStatus,
   PriceBookDirection,
   Prisma,
@@ -176,6 +177,11 @@ export class PurchaseOrdersService {
       if (item.status === ItemStatus.ARCHIVED) {
         throw new BadRequestException(
           `Archived item "${item.sku}" cannot be ordered.`,
+        );
+      }
+      if (item.variantKind === ItemVariantKind.TEMPLATE) {
+        throw new BadRequestException(
+          `Item "${item.sku}" is a product template. Select a concrete variant SKU instead.`,
         );
       }
 
@@ -527,6 +533,11 @@ export class PurchaseOrdersService {
           if (item.status === ItemStatus.ARCHIVED) {
             throw new BadRequestException(
               `Archived item "${item.sku}" cannot be ordered.`,
+            );
+          }
+          if (item.variantKind === ItemVariantKind.TEMPLATE) {
+            throw new BadRequestException(
+              `Item "${item.sku}" is a product template. Select a concrete variant SKU instead.`,
             );
           }
           const mapped = supplierItemMap.get(line.itemId);

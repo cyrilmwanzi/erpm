@@ -735,6 +735,7 @@ function mapControllerMethodToNamespace(controllerName, fullPath, methodName) {
     TenantsController: ["tenants"],
     InvitationsController: ["invitations"],
     ItemsController: ["items"],
+    VariantsController: ["variants"],
     LocationsController: ["locations"],
     InventoryController: ["inventory"],
     SuppliersController: ["suppliers"],

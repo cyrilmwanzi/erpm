@@ -79,6 +79,11 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   "ProductionConsumption",
   "MpesaConfiguration",
   "PaymentTransaction",
+  "VariantOption",
+  "VariantOptionValue",
+  "ItemTemplateOption",
+  "ItemTemplateOptionValue",
+  "ItemVariantAttribute",
 ]);
 
 let sharedPool: Pool | null = null;

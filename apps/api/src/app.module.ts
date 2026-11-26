@@ -27,6 +27,7 @@ import { StaffModule } from "./staff/staff.module.js";
 import { StorageModule } from "./storage/storage.module.js";
 import { TenancyModule } from "./tenancy/tenancy.module.js";
 import { TenantsModule } from "./tenants/tenants.module.js";
+import { VariantsModule } from "./variants/variants.module.js";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { TenantsModule } from "./tenants/tenants.module.js";
     HealthModule,
     TenantsModule,
     ItemsModule,
+    VariantsModule,
     LocationsModule,
     ProcurementModule,
     ProductionModule,

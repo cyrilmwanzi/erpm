@@ -7,6 +7,7 @@ import {
 import {
   DiscountScope,
   ItemStatus,
+  ItemVariantKind,
   PriceBookDirection,
   PricingModel,
   TenantContext,
@@ -60,6 +61,18 @@ export interface CalculatedQuoteLine {
   sku: string;
   name: string;
   type: string;
+  variantKind: string;
+  parentItemId: string | null;
+  pricingInheritedFromParent: boolean;
+  variantAttributes: Array<{
+    optionId: string;
+    optionCode: string;
+    optionName: string;
+    optionValueId: string;
+    valueCode: string;
+    valueLabel: string;
+    swatchHex: string | null;
+  }>;
   packId: string | null;
   packCode: string | null;
   unitOfMeasure: string;
@@ -169,22 +182,23 @@ export class PricingEngineService {
       ),
     );
 
-    const [
-      settings,
-      items,
-      packs,
-      servicePlans,
-      bundleRows,
-      supplierItems,
-      priceBooks,
-      discountRules,
-    ] = await Promise.all([
+    const [settings, items, packs, servicePlans, discountRules] = await Promise.all([
       this.prismaService.raw.tenantSettings.findUnique({
         where: { organizationId },
         select: { defaultCurrency: true },
       }),
       this.prismaService.raw.item.findMany({
         where: { organizationId, id: { in: itemIds } },
+        include: {
+          variantAttributes: {
+            include: {
+              option: { select: { id: true, code: true, name: true } },
+              optionValue: {
+                select: { id: true, code: true, label: true, swatchHex: true },
+              },
+            },
+          },
+        },
       }),
       packIds.length > 0
         ? this.prismaService.raw.itemPack.findMany({
@@ -194,6 +208,40 @@ export class PricingEngineService {
       servicePlanIds.length > 0
         ? this.prismaService.raw.servicePlan.findMany({
             where: { organizationId, id: { in: servicePlanIds } },
+          })
+        : Promise.resolve([]),
+      this.prismaService.raw.discountRule.findMany({
+        where: {
+          organizationId,
+          isActive: true,
+          AND: [
+            { OR: [{ startsAt: null }, { startsAt: { lte: atDate } }] },
+            { OR: [{ endsAt: null }, { endsAt: { gte: atDate } }] },
+            {
+              OR: [
+                { promoCode: null },
+                ...(promoCodes.length > 0 ? [{ promoCode: { in: promoCodes } }] : []),
+              ],
+            },
+          ],
+        },
+        orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
+      }),
+    ]);
+
+    const parentIds = Array.from(
+      new Set(
+        items
+          .map((i) => i.parentItemId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const lookupItemIds = Array.from(new Set([...itemIds, ...parentIds]));
+
+    const [parentItems, bundleRows, supplierItems, priceBooks] = await Promise.all([
+      parentIds.length > 0
+        ? this.prismaService.raw.item.findMany({
+            where: { organizationId, id: { in: parentIds } },
           })
         : Promise.resolve([]),
       this.prismaService.raw.itemBundleComponent.findMany({
@@ -224,7 +272,7 @@ export class PricingEngineService {
             where: {
               organizationId,
               supplierId: input.supplierId,
-              itemId: { in: itemIds },
+              itemId: { in: lookupItemIds },
             },
           })
         : Promise.resolve([]),
@@ -241,7 +289,7 @@ export class PricingEngineService {
         include: {
           rules: {
             where: {
-              itemId: { in: itemIds },
+              itemId: { in: lookupItemIds },
               isActive: true,
               AND: [
                 { OR: [{ startsAt: null }, { startsAt: { lte: atDate } }] },
@@ -255,27 +303,11 @@ export class PricingEngineService {
           },
         },
       }),
-      this.prismaService.raw.discountRule.findMany({
-        where: {
-          organizationId,
-          isActive: true,
-          AND: [
-            { OR: [{ startsAt: null }, { startsAt: { lte: atDate } }] },
-            { OR: [{ endsAt: null }, { endsAt: { gte: atDate } }] },
-            {
-              OR: [
-                { promoCode: null },
-                ...(promoCodes.length > 0 ? [{ promoCode: { in: promoCodes } }] : []),
-              ],
-            },
-          ],
-        },
-        orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
-      }),
     ]);
 
     const currency = (input.currency ?? settings?.defaultCurrency ?? "USD").toUpperCase();
     const itemMap = new Map(items.map((i) => [i.id, i]));
+    const parentItemMap = new Map(parentItems.map((i) => [i.id, i]));
     const packMap = new Map(packs.map((p) => [p.id, p]));
     const planMap = new Map(servicePlans.map((s) => [s.id, s]));
     const supplierItemMap = new Map(supplierItems.map((si) => [si.itemId, si]));
@@ -339,8 +371,47 @@ export class PricingEngineService {
         throw new BadRequestException("Line quantity must be >= 1.");
       }
 
+      const parentItem = item.parentItemId
+        ? parentItemMap.get(item.parentItemId)
+        : undefined;
+      const isVariant = item.variantKind === ItemVariantKind.VARIANT;
+      const canInheritSalePrice =
+        isVariant &&
+        item.inheritParentPricing &&
+        (item.salePriceOverrideCents === null ||
+          item.salePriceOverrideCents === undefined) &&
+        Boolean(parentItem);
+      const canInheritCostPrice =
+        isVariant &&
+        item.inheritParentPricing &&
+        (item.costPriceOverrideCents === null ||
+          item.costPriceOverrideCents === undefined) &&
+        Boolean(parentItem);
+
+      const resolvedSaleUnitPriceCents =
+        isVariant &&
+        item.salePriceOverrideCents !== null &&
+        item.salePriceOverrideCents !== undefined
+          ? item.salePriceOverrideCents
+          : canInheritSalePrice && parentItem
+            ? parentItem.salePriceCents
+            : item.salePriceCents;
+
+      const resolvedCostUnitPriceCents =
+        isVariant &&
+        item.costPriceOverrideCents !== null &&
+        item.costPriceOverrideCents !== undefined
+          ? item.costPriceOverrideCents
+          : canInheritCostPrice && parentItem
+            ? parentItem.costPriceCents
+            : item.costPriceCents;
+
       const pack = lineReq.packId ? packMap.get(lineReq.packId) : undefined;
-      if (lineReq.packId && (!pack || pack.itemId !== item.id || !pack.isActive)) {
+      const packBelongsToItemOrParent =
+        Boolean(pack) &&
+        (pack!.itemId === item.id ||
+          (isVariant && Boolean(item.parentItemId) && pack!.itemId === item.parentItemId));
+      if (lineReq.packId && (!pack || !packBelongsToItemOrParent || !pack.isActive)) {
         throw new BadRequestException(
           `Pack (${lineReq.packId}) is invalid, inactive, or does not belong to item "${item.sku}".`,
         );
@@ -394,8 +465,11 @@ export class PricingEngineService {
         isOptional: c.isOptional,
       }));
 
-      // Fallback unit price before price book rules
+      // Fallback unit price before price book rules (variant override -> parent fallback)
+      const isSharedParentPack = Boolean(pack && pack.itemId !== item.id);
       let fallbackUnitPriceCents: number;
+      let pricingInheritedFromParent = false;
+
       if (
         lineReq.overrideUnitPriceCents !== null &&
         lineReq.overrideUnitPriceCents !== undefined
@@ -404,21 +478,38 @@ export class PricingEngineService {
       } else if (servicePlan) {
         fallbackUnitPriceCents = servicePlan.basePriceCents;
       } else if (direction === PriceBookDirection.PURCHASE) {
-        const supItem = supplierItemMap.get(item.id);
-        if (pack?.costPriceCents !== null && pack?.costPriceCents !== undefined) {
+        const variantSupItem = supplierItemMap.get(item.id);
+        const parentSupItem =
+          !variantSupItem && item.inheritParentPricing && parentItem
+            ? supplierItemMap.get(parentItem.id)
+            : undefined;
+        const supItem = variantSupItem ?? parentSupItem;
+        if (
+          pack?.costPriceCents !== null &&
+          pack?.costPriceCents !== undefined &&
+          (!isSharedParentPack || canInheritCostPrice)
+        ) {
           fallbackUnitPriceCents = pack.costPriceCents;
+          pricingInheritedFromParent = isSharedParentPack;
         } else if (supItem && (!supItem.packId || supItem.packId === pack?.id)) {
           fallbackUnitPriceCents =
             supItem.packId === pack?.id
               ? supItem.unitCostCents
               : supItem.unitCostCents * unitsPerPack;
+          pricingInheritedFromParent = Boolean(!variantSupItem && parentSupItem);
         } else {
-          fallbackUnitPriceCents = item.costPriceCents * unitsPerPack;
+          fallbackUnitPriceCents = resolvedCostUnitPriceCents * unitsPerPack;
+          pricingInheritedFromParent = canInheritCostPrice;
         }
       } else {
-        if (pack?.salePriceCents !== null && pack?.salePriceCents !== undefined) {
+        if (
+          pack?.salePriceCents !== null &&
+          pack?.salePriceCents !== undefined &&
+          (!isSharedParentPack || canInheritSalePrice)
+        ) {
           fallbackUnitPriceCents = pack.salePriceCents;
-        } else if (compRows.length > 0 && item.salePriceCents === 0) {
+          pricingInheritedFromParent = isSharedParentPack;
+        } else if (compRows.length > 0 && resolvedSaleUnitPriceCents === 0) {
           fallbackUnitPriceCents = compRows
             .filter((c) => !c.isOptional)
             .reduce((sum, c) => {
@@ -428,7 +519,8 @@ export class PricingEngineService {
               return sum + c.quantity * compPrice;
             }, 0);
         } else {
-          fallbackUnitPriceCents = item.salePriceCents * unitsPerPack;
+          fallbackUnitPriceCents = resolvedSaleUnitPriceCents * unitsPerPack;
+          pricingInheritedFromParent = canInheritSalePrice;
         }
       }
 
@@ -440,21 +532,39 @@ export class PricingEngineService {
         lineReq.overrideUnitPriceCents === null ||
         lineReq.overrideUnitPriceCents === undefined
       ) {
+        const mergedTags = Array.from(
+          new Set([...item.tags, ...(parentItem?.tags ?? [])]),
+        );
         const condCtx = {
           channel: input.channel ?? undefined,
           customerSegment: input.customerSegment ?? undefined,
           externalAccountId: input.externalAccountId ?? undefined,
           lineQuantity: lineReq.quantity,
-          itemTags: item.tags,
+          itemTags: mergedTags,
           itemMetadata: (item.metadata as Record<string, unknown> | null) ?? null,
           atDate,
           customContext: input.customContext ?? undefined,
         };
 
+        const canInheritParentPriceBookRule =
+          isVariant &&
+          item.inheritParentPricing &&
+          Boolean(parentItem) &&
+          (direction === PriceBookDirection.PURCHASE
+            ? item.costPriceOverrideCents === null ||
+              item.costPriceOverrideCents === undefined
+            : item.salePriceOverrideCents === null ||
+              item.salePriceOverrideCents === undefined);
+
         for (const pb of eligibleBooks) {
           const candidates = pb.rules
             .filter((r) => {
-              if (r.itemId !== item.id) return false;
+              const matchesSelf = r.itemId === item.id;
+              const matchesParent =
+                canInheritParentPriceBookRule &&
+                parentItem !== undefined &&
+                r.itemId === parentItem.id;
+              if (!matchesSelf && !matchesParent) return false;
               if (r.packId && r.packId !== (pack?.id ?? null)) return false;
               if (r.servicePlanId && r.servicePlanId !== (servicePlan?.id ?? null)) {
                 return false;
@@ -467,13 +577,16 @@ export class PricingEngineService {
             })
             .sort((a, b) => {
               const targetScore = (r: typeof a) =>
-                (r.servicePlanId ? 0 : 1) + (r.packId ? 0 : 2);
+                (r.itemId === item.id ? 0 : 10) +
+                (r.servicePlanId ? 0 : 1) +
+                (r.packId ? 0 : 2);
               return targetScore(a) - targetScore(b) || a.priority - b.priority;
             });
 
           if (candidates[0]) {
             matchedBook = pb;
             matchedRule = candidates[0];
+            pricingInheritedFromParent = matchedRule.itemId !== item.id;
             break;
           }
         }
@@ -500,7 +613,7 @@ export class PricingEngineService {
 
       const unitCostForFloor =
         direction === PriceBookDirection.SALES
-          ? (pack?.costPriceCents ?? item.costPriceCents * unitsPerPack)
+          ? (pack?.costPriceCents ?? resolvedCostUnitPriceCents * unitsPerPack)
           : 0;
 
       const marginCheck = enforceMinMarginFloor(
@@ -518,6 +631,18 @@ export class PricingEngineService {
         sku: item.sku,
         name: item.name,
         type: item.type,
+        variantKind: item.variantKind,
+        parentItemId: item.parentItemId ?? null,
+        pricingInheritedFromParent,
+        variantAttributes: item.variantAttributes.map((attr) => ({
+          optionId: attr.optionId,
+          optionCode: attr.option.code,
+          optionName: attr.option.name,
+          optionValueId: attr.optionValueId,
+          valueCode: attr.optionValue.code,
+          valueLabel: attr.optionValue.label,
+          swatchHex: attr.optionValue.swatchHex,
+        })),
         packId: pack?.id ?? null,
         packCode: pack?.code ?? null,
         unitOfMeasure: pack ? pack.unitOfMeasure : item.unitOfMeasure,
@@ -590,16 +715,22 @@ export class PricingEngineService {
       return true;
     });
 
-    // Pass 2: line-level discounts & BOGO
+    // Pass 2: line-level discounts & BOGO (with parent template fallback)
     for (const line of calculatedLines) {
       const item = itemMap.get(line.itemId)!;
+      const parentItem = line.parentItemId
+        ? parentItemMap.get(line.parentItemId)
+        : undefined;
+      const mergedTags = Array.from(
+        new Set([...item.tags, ...(parentItem?.tags ?? [])]),
+      );
       const condCtx = {
         channel: input.channel ?? undefined,
         customerSegment: input.customerSegment ?? undefined,
         externalAccountId: input.externalAccountId ?? undefined,
         lineQuantity: line.quantity,
         orderSubtotalCents: subtotalAfterTiersCents,
-        itemTags: item.tags,
+        itemTags: mergedTags,
         itemMetadata: (item.metadata as Record<string, unknown> | null) ?? null,
         atDate,
         customContext: input.customContext ?? undefined,
@@ -607,11 +738,17 @@ export class PricingEngineService {
 
       const eligibleLineDiscounts = activeDiscounts.filter((d) => {
         if (d.scope !== DiscountScope.LINE_ITEM) return false;
-        if (d.targetItemId && d.targetItemId !== line.itemId) return false;
+        if (
+          d.targetItemId &&
+          d.targetItemId !== line.itemId &&
+          !(line.parentItemId && d.targetItemId === line.parentItemId)
+        ) {
+          return false;
+        }
         if (d.targetPackId && d.targetPackId !== line.packId) return false;
         if (
           d.targetTags.length > 0 &&
-          !d.targetTags.some((tag) => item.tags.includes(tag))
+          !d.targetTags.some((tag) => mergedTags.includes(tag))
         ) {
           return false;
         }

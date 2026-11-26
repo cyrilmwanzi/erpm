@@ -10,7 +10,7 @@ import {
   Query,
   Req,
 } from "@nestjs/common";
-import { ItemStatus, ItemType } from "@scace/db";
+import { ItemStatus, ItemType, ItemVariantKind } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -33,6 +33,12 @@ const itemStatusEnum = z.enum([
   ItemStatus.DRAFT,
   ItemStatus.ACTIVE,
   ItemStatus.ARCHIVED,
+]);
+
+const itemVariantKindEnum = z.enum([
+  ItemVariantKind.STANDARD,
+  ItemVariantKind.TEMPLATE,
+  ItemVariantKind.VARIANT,
 ]);
 
 const mutableStatusEnum = z.enum([ItemStatus.DRAFT, ItemStatus.ACTIVE]);
@@ -71,6 +77,9 @@ const createItemSchema = z.object({
   allowNegativeStock: z.boolean().optional(),
   reorderPoint: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
   isBundle: z.boolean().optional(),
+  variantKind: z
+    .enum([ItemVariantKind.STANDARD, ItemVariantKind.TEMPLATE])
+    .optional(),
   tags: tagsSchema.optional(),
   metadata: metadataSchema.optional(),
   reason: z.string().trim().min(1).max(500).optional(),
@@ -99,6 +108,12 @@ const updateItemSchema = z.object({
 const listItemsQuerySchema = z.object({
   type: itemTypeEnum.optional(),
   status: itemStatusEnum.optional(),
+  variantKind: itemVariantKindEnum.optional(),
+  parentItemId: z.string().trim().min(1).optional(),
+  includeTemplates: z
+    .enum(["true", "false"])
+    .transform((val) => val === "true")
+    .optional(),
   trackInventory: z
     .enum(["true", "false"])
     .transform((val) => val === "true")

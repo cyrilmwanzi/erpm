@@ -8,6 +8,7 @@ import {
 import {
   ItemStatus,
   ItemType,
+  ItemVariantKind,
   Prisma,
   TenantContext,
   type Item,
@@ -30,6 +31,7 @@ export interface CreateItemInput {
   allowNegativeStock?: boolean;
   reorderPoint?: number | null;
   isBundle?: boolean;
+  variantKind?: "STANDARD" | "TEMPLATE";
   tags?: string[];
   metadata?: Record<string, unknown> | null;
   reason?: string;
@@ -58,6 +60,9 @@ export interface UpdateItemInput {
 export interface ListItemsQuery {
   type?: ItemType;
   status?: ItemStatus;
+  variantKind?: ItemVariantKind;
+  parentItemId?: string;
+  includeTemplates?: boolean;
   trackInventory?: boolean;
   tag?: string;
   search?: string;
@@ -146,8 +151,21 @@ export class ItemsService {
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
+    const variantKind =
+      input.variantKind === ItemVariantKind.TEMPLATE
+        ? ItemVariantKind.TEMPLATE
+        : ItemVariantKind.STANDARD;
+
+    if (variantKind === ItemVariantKind.TEMPLATE && input.trackInventory === true) {
+      throw new BadRequestException(
+        "Template items cannot track inventory directly; track inventory on concrete variant SKUs.",
+      );
+    }
+
     const trackInventory =
-      input.trackInventory ?? input.type !== ItemType.SERVICE;
+      variantKind === ItemVariantKind.TEMPLATE
+        ? false
+        : (input.trackInventory ?? input.type !== ItemType.SERVICE);
 
     if (!trackInventory) {
       if (input.allowNegativeStock === true) {
@@ -203,6 +221,7 @@ export class ItemsService {
             allowNegativeStock,
             reorderPoint,
             isBundle: input.isBundle ?? false,
+            variantKind,
             tags: normalizedTags,
             metadata: toNullableJsonInput(normalizedMetadata),
             version: 1,
@@ -225,6 +244,7 @@ export class ItemsService {
           allowNegativeStock: { from: null, to: item.allowNegativeStock },
           reorderPoint: { from: null, to: item.reorderPoint },
           isBundle: { from: null, to: item.isBundle },
+          variantKind: { from: null, to: item.variantKind },
           tags: { from: null, to: item.tags },
           metadata: { from: null, to: item.metadata },
         };
@@ -284,6 +304,12 @@ export class ItemsService {
     const where: Prisma.ItemWhereInput = {
       ...(query.type ? { type: query.type } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.variantKind
+        ? { variantKind: query.variantKind }
+        : query.includeTemplates === false
+          ? { variantKind: { not: ItemVariantKind.TEMPLATE } }
+          : {}),
+      ...(query.parentItemId ? { parentItemId: query.parentItemId } : {}),
       ...(query.trackInventory !== undefined
         ? { trackInventory: query.trackInventory }
         : {}),
@@ -301,6 +327,17 @@ export class ItemsService {
 
     const records = await this.prismaService.scoped.item.findMany({
       where,
+      include: {
+        variantAttributes: {
+          include: {
+            option: { select: { id: true, code: true, name: true, displayType: true } },
+            optionValue: {
+              select: { id: true, code: true, label: true, swatchHex: true },
+            },
+          },
+        },
+        _count: { select: { variants: true } },
+      },
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -377,6 +414,15 @@ export class ItemsService {
         ) {
           throw new ConflictException(
             `Version mismatch: expected version ${input.expectedVersion}, current version is ${existing.version}.`,
+          );
+        }
+
+        if (
+          existing.variantKind === ItemVariantKind.TEMPLATE &&
+          input.trackInventory === true
+        ) {
+          throw new BadRequestException(
+            "Template items cannot track inventory directly; track inventory on concrete variant SKUs.",
           );
         }
 
@@ -495,7 +541,25 @@ export class ItemsService {
         }
 
         if (Object.keys(changes).length === 0) {
-          return { item: existing, revision: null, changed: false };
+          return {
+            item: existing,
+            revision: null,
+            changed: false,
+            syncedVariantIds: [] as string[],
+          };
+        }
+
+        if (
+          existing.variantKind === ItemVariantKind.VARIANT &&
+          input.salePriceCents !== undefined
+        ) {
+          updateData.salePriceOverrideCents = input.salePriceCents;
+        }
+        if (
+          existing.variantKind === ItemVariantKind.VARIANT &&
+          input.costPriceCents !== undefined
+        ) {
+          updateData.costPriceOverrideCents = input.costPriceCents;
         }
 
         const nextVersion = existing.version + 1;
@@ -522,6 +586,59 @@ export class ItemsService {
           where: { id: itemId, organizationId },
         });
 
+        let syncedVariantIds: string[] = [];
+        if (
+          updatedItem.variantKind === ItemVariantKind.TEMPLATE &&
+          (changes.salePriceCents !== undefined ||
+            changes.costPriceCents !== undefined)
+        ) {
+          const affectedVariants = await tx.item.findMany({
+            where: {
+              organizationId,
+              parentItemId: itemId,
+              variantKind: ItemVariantKind.VARIANT,
+              inheritParentPricing: true,
+            },
+            select: {
+              id: true,
+              salePriceOverrideCents: true,
+              costPriceOverrideCents: true,
+            },
+          });
+
+          if (changes.salePriceCents !== undefined) {
+            const idsToSync = affectedVariants
+              .filter((v) => v.salePriceOverrideCents === null)
+              .map((v) => v.id);
+            if (idsToSync.length > 0) {
+              await tx.item.updateMany({
+                where: { id: { in: idsToSync }, organizationId },
+                data: {
+                  salePriceCents: updatedItem.salePriceCents,
+                  updatedByUserId: tenant.userId,
+                },
+              });
+              syncedVariantIds.push(...idsToSync);
+            }
+          }
+
+          if (changes.costPriceCents !== undefined) {
+            const idsToSync = affectedVariants
+              .filter((v) => v.costPriceOverrideCents === null)
+              .map((v) => v.id);
+            if (idsToSync.length > 0) {
+              await tx.item.updateMany({
+                where: { id: { in: idsToSync }, organizationId },
+                data: {
+                  costPriceCents: updatedItem.costPriceCents,
+                  updatedByUserId: tenant.userId,
+                },
+              });
+              syncedVariantIds.push(...idsToSync);
+            }
+          }
+        }
+
         const revision = await tx.itemRevision.create({
           data: {
             organizationId,
@@ -546,20 +663,35 @@ export class ItemsService {
               version: nextVersion,
               changedFields: Object.keys(changes),
               changes,
+              ...(syncedVariantIds.length > 0
+                ? { syncedInheritingVariantCount: new Set(syncedVariantIds).size }
+                : {}),
               ...(input.reason ? { reason: input.reason } : {}),
             } as unknown as Prisma.InputJsonValue,
             ipAddress: ipAddress ?? null,
           },
         });
 
-        return { item: updatedItem, revision, changed: true };
+        return {
+          item: updatedItem,
+          revision,
+          changed: true,
+          syncedVariantIds: Array.from(new Set(syncedVariantIds)),
+        };
       });
 
       if (result.changed) {
         await this.invalidateItemCacheSafe(organizationId, itemId);
+        for (const variantId of result.syncedVariantIds) {
+          await this.invalidateItemCacheSafe(organizationId, variantId);
+        }
       }
 
-      return result;
+      return {
+        item: result.item,
+        revision: result.revision,
+        changed: result.changed,
+      };
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ConflictException(

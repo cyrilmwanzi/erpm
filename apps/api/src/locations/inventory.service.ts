@@ -8,6 +8,7 @@ import {
 import {
   ItemStatus,
   ItemType,
+  ItemVariantKind,
   LocationStatus,
   LotAllocationStrategy,
   Prisma,
@@ -657,6 +658,11 @@ export class InventoryService {
           "Cannot adjust stock for an archived catalog item.",
         );
       }
+      if (item.variantKind === ItemVariantKind.TEMPLATE) {
+        throw new BadRequestException(
+          `Item "${item.sku}" is a product template. Adjust stock on concrete variant SKUs instead.`,
+        );
+      }
       if (!item.trackInventory) {
         throw new BadRequestException(
           `Item "${item.sku}" has trackInventory disabled and cannot hold stock.`,
@@ -812,6 +818,11 @@ export class InventoryService {
           if (item.status === ItemStatus.ARCHIVED) {
             throw new BadRequestException(
               `Archived item "${item.sku}" cannot be transferred.`,
+            );
+          }
+          if (item.variantKind === ItemVariantKind.TEMPLATE) {
+            throw new BadRequestException(
+              `Item "${item.sku}" is a product template. Transfer concrete variant SKUs instead.`,
             );
           }
           if (!item.trackInventory) {
