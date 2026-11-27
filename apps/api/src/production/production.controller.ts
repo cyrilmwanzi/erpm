@@ -15,12 +15,12 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { attachStoredObjectSchema } from "../storage/attachments.service.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ProductionService } from "./production.service.js";
 
 const priorityEnum = z.enum([
@@ -132,7 +132,7 @@ const cancelBatchSchema = z.object({
 });
 
 @Controller("api/v1/production")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("production")
 export class ProductionController {
   constructor(
@@ -143,7 +143,7 @@ export class ProductionController {
   @Post("batches")
   @RequiredOrgPermissions({ production: ["create"] })
   async createBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -161,7 +161,7 @@ export class ProductionController {
   @Get("batches")
   @RequiredOrgPermissions({ production: ["read"] })
   async listBatches(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listBatchesQuerySchema.safeParse(query ?? {});
@@ -178,7 +178,7 @@ export class ProductionController {
   @Get("batches/:batchId")
   @RequiredOrgPermissions({ production: ["read"] })
   async getBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
   ) {
     return this.productionService.getBatch(tenant, batchId);
@@ -187,7 +187,7 @@ export class ProductionController {
   @Post("batches/:batchId/release")
   @RequiredOrgPermissions({ production: ["release"] })
   async releaseBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -211,7 +211,7 @@ export class ProductionController {
   @Post("batches/:batchId/start")
   @RequiredOrgPermissions({ production: ["update"] })
   async startBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -221,7 +221,7 @@ export class ProductionController {
   @Post("batches/:batchId/suggest-lots")
   @RequiredOrgPermissions({ production: ["read"] })
   async suggestLotsForBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
   ) {
@@ -243,7 +243,7 @@ export class ProductionController {
   @Post("batches/:batchId/consume")
   @RequiredOrgPermissions({ production: ["consume"] })
   async consumeMaterials(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -270,7 +270,7 @@ export class ProductionController {
   @Post("batches/:batchId/complete")
   @RequiredOrgPermissions({ production: ["complete"] })
   async completeBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -294,7 +294,7 @@ export class ProductionController {
   @Post("batches/:batchId/cancel")
   @RequiredOrgPermissions({ production: ["cancel"] })
   async cancelBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -318,7 +318,7 @@ export class ProductionController {
   @Get("batches/:batchId/traceability")
   @RequiredOrgPermissions({ production: ["read"] })
   async getBatchTraceability(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
   ) {
     return this.productionService.getBatchTraceability(tenant, batchId);
@@ -327,7 +327,7 @@ export class ProductionController {
   @Get("batches/:batchId/files")
   @RequiredOrgPermissions({ production: ["read"] })
   async listBatchFiles(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
   ) {
     return this.productionService.listBatchFiles(tenant, batchId);
@@ -336,7 +336,7 @@ export class ProductionController {
   @Post("batches/:batchId/files")
   @RequiredOrgPermissions({ production: ["update"] })
   async addBatchFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Req() req: FastifyRequest,
     @Body() body: unknown,
@@ -347,7 +347,7 @@ export class ProductionController {
   @Delete("batches/:batchId/files/:attachmentId")
   @RequiredOrgPermissions({ production: ["update"] })
   async removeBatchFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("attachmentId") attachmentId: string,
     @Req() req: FastifyRequest,

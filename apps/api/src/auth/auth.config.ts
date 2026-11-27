@@ -384,7 +384,7 @@ export const auth = betterAuth({
       cancelPendingInvitationsOnReInvite: true,
       requireEmailVerificationOnInvitation: true,
       async sendInvitationEmail(data) {
-        const acceptUrl = `${env.BETTER_AUTH_URL}/api/v1/tenants/invitations/${encodeURIComponent(
+        const acceptUrl = `${env.BETTER_AUTH_URL}/api/v1/organizations/invitations/${encodeURIComponent(
           data.id,
         )}/accept`;
 
@@ -405,7 +405,7 @@ export const auth = betterAuth({
             org.id,
             env.RUSTFS_BUCKET_PREFIX,
           );
-          await prisma.tenantSettings.upsert({
+          await prisma.organizationSettings.upsert({
             where: { organizationId: org.id },
             update: {},
             create: {

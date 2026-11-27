@@ -13,11 +13,11 @@ import { VendorBillStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { VendorBillsService } from "./vendor-bills.service.js";
 
 const currencySchema = z
@@ -88,7 +88,7 @@ const voidBillSchema = z.object({
 });
 
 @Controller("api/v1/vendor-bills")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class VendorBillsController {
   constructor(
     @Inject(VendorBillsService)
@@ -98,7 +98,7 @@ export class VendorBillsController {
   @Post()
   @RequiredOrgPermissions({ vendorBill: ["create"] })
   async createVendorBill(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -120,7 +120,7 @@ export class VendorBillsController {
   @Post("from-delivery/:deliveryId")
   @RequiredOrgPermissions({ vendorBill: ["create"] })
   async createVendorBillFromDelivery(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -144,7 +144,7 @@ export class VendorBillsController {
   @Get()
   @RequiredOrgPermissions({ vendorBill: ["read"] })
   async listVendorBills(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listVendorBillsQuerySchema.safeParse(query ?? {});
@@ -161,7 +161,7 @@ export class VendorBillsController {
   @Get(":billId")
   @RequiredOrgPermissions({ vendorBill: ["read"] })
   async getVendorBill(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("billId") billId: string,
   ) {
     return this.vendorBillsService.getVendorBill(tenant, billId);
@@ -170,7 +170,7 @@ export class VendorBillsController {
   @Post(":billId/post")
   @RequiredOrgPermissions({ vendorBill: ["update"] })
   async postVendorBill(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("billId") billId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -180,7 +180,7 @@ export class VendorBillsController {
   @Post(":billId/payments")
   @RequiredOrgPermissions({ vendorBill: ["pay"] })
   async recordPayment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("billId") billId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -205,7 +205,7 @@ export class VendorBillsController {
   @Post(":billId/void")
   @RequiredOrgPermissions({ vendorBill: ["void"] })
   async voidVendorBill(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("billId") billId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

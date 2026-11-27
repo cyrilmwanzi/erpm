@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
 import { getEnv } from "../config/env.js";
-import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
+import type { OrganizationScopedRequest } from "../organizations/organization.decorators.js";
 import { AnalyticsService } from "./analytics.service.js";
 import {
   extractErrorDetails,
@@ -16,7 +16,7 @@ import {
 } from "./scrubbing.utils.js";
 import { SentryService } from "./sentry.service.js";
 
-export type CorrelationRequest = TenantScopedRequest & {
+export type CorrelationRequest = OrganizationScopedRequest & {
   requestId?: string;
   routeOptions?: { url?: string };
 };
@@ -61,14 +61,14 @@ export class EnterpriseExceptionFilter implements ExceptionFilter {
 
     const normalized = extractErrorDetails(exception, includeDebugDetails);
     const organizationId =
-      request.tenant?.organizationId ??
+      request.organization?.organizationId ??
       request.authContext?.organizationId ??
       request.session?.session?.activeOrganizationId ??
       null;
-    const userId = request.tenant?.userId ?? request.session?.user?.id ?? null;
-    const role = request.tenant?.role ?? null;
+    const userId = request.organization?.userId ?? request.session?.user?.id ?? null;
+    const role = request.organization?.role ?? null;
     const authMethod =
-      request.tenant?.authMethod ?? request.authContext?.authMethod ?? null;
+      request.organization?.authMethod ?? request.authContext?.authMethod ?? null;
     const routePattern =
       request.routeOptions?.url ??
       scrubUrlQuery(request.url.split("?")[0] ?? request.url);

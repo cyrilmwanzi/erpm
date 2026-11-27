@@ -9,7 +9,7 @@ import {
   MpesaEnvironment,
   MpesaShortcodeType,
   Prisma,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import {
   generateRandomToken,
@@ -18,7 +18,7 @@ import {
 } from "../auth/crypto.utils.js";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   MpesaDarajaClient,
   type DarajaCredentialsContext,
@@ -84,7 +84,7 @@ export class MpesaConfigService {
     @Inject(MpesaDarajaClient) private readonly darajaClient: MpesaDarajaClient,
   ) {}
 
-  async getConfig(tenant: AuthenticatedTenant): Promise<SanitizedMpesaConfigResponse | null> {
+  async getConfig(tenant: AuthenticatedOrganization): Promise<SanitizedMpesaConfigResponse | null> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const config = await this.prismaService.scoped.mpesaConfiguration.findFirst({
       where: { organizationId },
@@ -96,7 +96,7 @@ export class MpesaConfigService {
   }
 
   async upsertConfig(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: UpsertMpesaConfigurationInput,
     ipAddress?: string,
   ): Promise<SanitizedMpesaConfigResponse> {
@@ -253,7 +253,7 @@ export class MpesaConfigService {
   }
 
   async rotateCallbackToken(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ipAddress?: string,
   ): Promise<SanitizedMpesaConfigResponse> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -300,7 +300,7 @@ export class MpesaConfigService {
   }
 
   async testConnection(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -365,7 +365,7 @@ export class MpesaConfigService {
   }
 
   async registerC2bUrls(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -557,10 +557,10 @@ export class MpesaConfigService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

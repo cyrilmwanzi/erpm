@@ -26,11 +26,11 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { MpesaPaymentService } from "../payments/mpesa-payment.service.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { FulfillmentNotificationsService } from "./fulfillment-notifications.service.js";
 import { FulfillmentsService } from "./fulfillments.service.js";
 import { StaffJobsService } from "./staff-jobs.service.js";
@@ -306,7 +306,7 @@ const fulfillmentMpesaStkSchema = z.object({
 });
 
 @Controller("api/v1/fulfillments")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class FulfillmentsController {
   constructor(
     @Inject(FulfillmentsService)
@@ -325,14 +325,14 @@ export class FulfillmentsController {
 
   @Get("settings")
   @RequiredOrgPermissions({ fulfillment: ["read"] })
-  async getSettings(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getSettings(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.fulfillmentsService.getOrCreateSettings(tenant);
   }
 
   @Put("settings")
   @RequiredOrgPermissions({ fulfillment: ["configure"] })
   async updateSettings(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -348,14 +348,14 @@ export class FulfillmentsController {
 
   @Get("templates")
   @RequiredOrgPermissions({ notification: ["read"] })
-  async listTemplates(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async listTemplates(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.notificationsService.listTemplates(tenant);
   }
 
   @Put("templates")
   @RequiredOrgPermissions({ notification: ["configureTemplates"] })
   async upsertTemplate(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -372,7 +372,7 @@ export class FulfillmentsController {
   @Delete("templates/:eventType/:channel")
   @RequiredOrgPermissions({ notification: ["configureTemplates"] })
   async resetTemplate(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("eventType") eventType: string,
     @Param("channel") channel: string,
     @Req() req: FastifyRequest,
@@ -393,7 +393,7 @@ export class FulfillmentsController {
   @Get("notifications")
   @RequiredOrgPermissions({ notification: ["read"] })
   async listNotifications(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listNotificationsQuerySchema.safeParse(query ?? {});
@@ -413,7 +413,7 @@ export class FulfillmentsController {
   @Post()
   @RequiredOrgPermissions({ fulfillment: ["create"] })
   async createFulfillment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -434,7 +434,7 @@ export class FulfillmentsController {
   @Get()
   @RequiredOrgPermissions({ fulfillment: ["read"] })
   async listFulfillments(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listFulfillmentsQuerySchema.safeParse(query ?? {});
@@ -450,7 +450,7 @@ export class FulfillmentsController {
   @Get(":fulfillmentId")
   @RequiredOrgPermissions({ fulfillment: ["read"] })
   async getFulfillment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
   ) {
     return this.fulfillmentsService.getFulfillment(tenant, fulfillmentId);
@@ -459,7 +459,7 @@ export class FulfillmentsController {
   @Patch(":fulfillmentId")
   @RequiredOrgPermissions({ fulfillment: ["update"] })
   async updateFulfillment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -482,7 +482,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/confirm")
   @RequiredOrgPermissions({ fulfillment: ["confirm"] })
   async confirmFulfillment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -496,7 +496,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/status")
   @RequiredOrgPermissions({ fulfillment: ["update"] })
   async transitionStatus(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -519,7 +519,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/payments")
   @RequiredOrgPermissions({ payment: ["record"] })
   async recordCashPayment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -542,7 +542,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/payments/mpesa/stk-push")
   @RequiredOrgPermissions({ payment: ["record"] })
   async initiateFulfillmentMpesaStkPush(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -566,7 +566,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/pickup/handoff")
   @RequiredOrgPermissions({ fulfillment: ["complete"] })
   async confirmPickupHandoff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -589,7 +589,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/delivery/out-for-delivery")
   @RequiredOrgPermissions({ fulfillment: ["update"] })
   async markOutForDelivery(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -612,7 +612,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/delivery/delivered")
   @RequiredOrgPermissions({ fulfillment: ["complete"] })
   async markDelivered(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -635,7 +635,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/cancel")
   @RequiredOrgPermissions({ fulfillment: ["cancel"] })
   async cancelFulfillment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -658,7 +658,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/convert-to-job")
   @RequiredOrgPermissions({ staffJob: ["create"] })
   async convertToJob(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -681,7 +681,7 @@ export class FulfillmentsController {
   @Patch(":fulfillmentId/notifications")
   @RequiredOrgPermissions({ fulfillment: ["update"] })
   async updateNotificationPreferences(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -704,7 +704,7 @@ export class FulfillmentsController {
   @Post(":fulfillmentId/notify")
   @RequiredOrgPermissions({ notification: ["send"] })
   async notifyCustomer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("fulfillmentId") fulfillmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

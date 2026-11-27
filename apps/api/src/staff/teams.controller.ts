@@ -15,11 +15,11 @@ import { TeamKind, TeamStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { TeamsService } from "./teams.service.js";
 
 const teamKindEnum = z.enum([
@@ -72,7 +72,7 @@ const upsertTeamMemberSchema = z.object({
 });
 
 @Controller("api/v1/teams")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class TeamsController {
   constructor(
     @Inject(TeamsService) private readonly teamsService: TeamsService,
@@ -81,7 +81,7 @@ export class TeamsController {
   @Post()
   @RequiredOrgPermissions({ team: ["create"] })
   async createTeam(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -98,7 +98,7 @@ export class TeamsController {
   @Get()
   @RequiredOrgPermissions({ team: ["read"] })
   async listTeams(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listTeamsQuerySchema.safeParse(query ?? {});
@@ -114,7 +114,7 @@ export class TeamsController {
   @Get(":teamId")
   @RequiredOrgPermissions({ team: ["read"] })
   async getTeam(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("teamId") teamId: string,
   ) {
     return this.teamsService.getTeam(tenant, teamId);
@@ -123,7 +123,7 @@ export class TeamsController {
   @Patch(":teamId")
   @RequiredOrgPermissions({ team: ["update"] })
   async updateTeam(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("teamId") teamId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -141,7 +141,7 @@ export class TeamsController {
   @Post(":teamId/archive")
   @RequiredOrgPermissions({ team: ["archive"] })
   async archiveTeam(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("teamId") teamId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -151,7 +151,7 @@ export class TeamsController {
   @Post(":teamId/members")
   @RequiredOrgPermissions({ team: ["update"] })
   async upsertTeamMember(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("teamId") teamId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -174,7 +174,7 @@ export class TeamsController {
   @Delete(":teamId/members/:staffId")
   @RequiredOrgPermissions({ team: ["update"] })
   async removeTeamMember(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("teamId") teamId: string,
     @Param("staffId") staffId: string,
     @Req() req: FastifyRequest,

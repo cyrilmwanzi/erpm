@@ -104,8 +104,8 @@ async function bootstrap() {
     ]);
   });
 
-  await app.listen(3000, "0.0.0.0");
-  logger.log("Scace API (Fastify) listening on http://0.0.0.0:3000");
+  await app.listen(env.PORT, env.HOST);
+  logger.log(`Scace API (Fastify) listening on http://${env.HOST}:${env.PORT}`);
 }
 
 bootstrap().catch((error: unknown) => {

@@ -704,8 +704,8 @@ function createTestHarness() {
     },
   };
 
-  // Mimics TenantPrismaExtension scoping org_a vs org_b
-  let activeTenantOrgId = "org_a";
+  // Mimics OrganizationPrismaExtension scoping org_a vs org_b
+  let activeOrgId = "org_a";
   const scopedProxy = new Proxy(rawDb, {
     get(target, prop: string) {
       const delegate = target[prop];
@@ -715,12 +715,12 @@ function createTestHarness() {
         findMany: async (args: any = {}) =>
           delegate.findMany({
             ...args,
-            where: { ...(args.where ?? {}), organizationId: activeTenantOrgId },
+            where: { ...(args.where ?? {}), organizationId: activeOrgId },
           }),
         findFirst: async (args: any = {}) =>
           delegate.findFirst({
             ...args,
-            where: { ...(args.where ?? {}), organizationId: activeTenantOrgId },
+            where: { ...(args.where ?? {}), organizationId: activeOrgId },
           }),
       };
     },
@@ -739,7 +739,7 @@ function createTestHarness() {
   };
 
   const storageService: any = {
-    uploadDirect: async (_tenant: any, input: any) => ({
+    uploadDirect: async (_org: any, input: any) => ({
       id: nextId("obj"),
       originalName: input.filename,
       sizeBytes: input.buffer.byteLength,
@@ -784,7 +784,7 @@ function createTestHarness() {
 
   return {
     setOrg: (orgId: string) => {
-      activeTenantOrgId = orgId;
+      activeOrgId = orgId;
     },
     seedBalance: (orgId: string, itemId: string, locationId: string, qty: number) => {
       const rec = {
@@ -957,14 +957,14 @@ describe("Stock Expiry Utilities, FEFO Allocation & Permissions", () => {
 describe("Expiry Scanner, Auto-Quarantine, Write-Offs & Communication Outbox", () => {
   it("scans lots idempotently, auto-quarantines expired stock, and routes outbox alerts with AlertRule cooldowns", async () => {
     const h = createTestHarness();
-    const tenantA = {
+    const orgA = {
       organizationId: "org_a",
       memberId: "mem_1",
       role: "owner",
       userId: "user_owner_a",
     };
 
-    await h.expiryService.updatePolicy(tenantA, {
+    await h.expiryService.updatePolicy(orgA, {
       warningDays: 30,
       criticalDays: 7,
       enforcementMode: ExpiryEnforcementMode.BLOCK_EXPIRED,
@@ -972,7 +972,7 @@ describe("Expiry Scanner, Auto-Quarantine, Write-Offs & Communication Outbox", (
       isScannerActive: true,
     });
 
-    await h.outboxService.createAlertRule(tenantA, {
+    await h.outboxService.createAlertRule(orgA, {
       name: "Expired Stock Operations Rule",
       eventType: CommunicationEventType.STOCK_EXPIRED,
       channels: [CommunicationChannel.EMAIL, CommunicationChannel.IN_APP],
@@ -1001,7 +1001,7 @@ describe("Expiry Scanner, Auto-Quarantine, Write-Offs & Communication Outbox", (
       unitCostCents: 120,
     });
 
-    const scan1 = await h.expiryService.runManualScan(tenantA);
+    const scan1 = await h.expiryService.runManualScan(orgA);
     assert.equal(scan1.expiredLotsCount, 1);
     assert.equal(scan1.criticalLotsCount, 1);
     assert.equal(scan1.alertsCreated, 2);
@@ -1020,12 +1020,12 @@ describe("Expiry Scanner, Auto-Quarantine, Write-Offs & Communication Outbox", (
     assert.ok(expiredOutbox.targetEmails.includes("qa@alpha.test"));
 
     // Second scan on same day must deduplicate alerts (0 new alerts)
-    const scan2 = await h.expiryService.runManualScan(tenantA);
+    const scan2 = await h.expiryService.runManualScan(orgA);
     assert.equal(scan2.alertsCreated, 0);
     assert.equal(scan2.alertsUpdated, 2);
 
     // Write off the quarantined expired lot -> resolves alert & emits STOCK_EXPIRY_WRITEOFF
-    const writeOff = await h.expiryService.writeOffLot(tenantA, expiredLot.id, {
+    const writeOff = await h.expiryService.writeOffLot(orgA, expiredLot.id, {
       quantity: 5,
       source: "QUARANTINED",
       reason: "Expired past shelf life",
@@ -1046,18 +1046,18 @@ describe("Expiry Scanner, Auto-Quarantine, Write-Offs & Communication Outbox", (
 
     // Consumer claim & acknowledge flow (isolated per org)
     h.setOrg("org_b");
-    const tenantB = {
+    const orgB = {
       organizationId: "org_b",
       memberId: "mem_3",
       role: "owner",
       userId: "user_owner_b",
     };
-    const orgBOutbox = await h.outboxService.listOutboxEvents(tenantB, { limit: 25 });
+    const orgBOutbox = await h.outboxService.listOutboxEvents(orgB, { limit: 25 });
     assert.equal(orgBOutbox.items.length, 0);
 
     // Test extendLotExpiry resolves open critical alert when pushed outside warning window
     h.setOrg("org_a");
-    await h.expiryService.extendLotExpiry(tenantA, critLot.id, {
+    await h.expiryService.extendLotExpiry(orgA, critLot.id, {
       newExpiresAt: new Date(Date.now() + 90 * 86_400_000).toISOString(),
       reason: "Lab stability extension approved",
     });
@@ -1102,7 +1102,7 @@ describe("Expiry Scanner, Auto-Quarantine, Write-Offs & Communication Outbox", (
 });
 
 describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
-  it("generates all 4 report domains with strict tenant isolation, safe CSV, and valid PDF exports", async () => {
+  it("generates all 4 report domains with strict organization isolation, safe CSV, and valid PDF exports", async () => {
     const h = createTestHarness();
     h.seedBalance("org_a", "item_milk", "loc_a", 20);
     h.seedBalance("org_b", "item_sugar", "loc_b", 999);
@@ -1116,7 +1116,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
       unitCostCents: 120,
     });
 
-    const tenantA = {
+    const orgA = {
       organizationId: "org_a",
       memberId: "mem_1",
       role: "owner",
@@ -1124,7 +1124,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
     };
 
     const inv = await h.reportsService.queryDomainReport(
-      tenantA,
+      orgA,
       ReportDomain.INVENTORY_EXPIRY,
       {},
     );
@@ -1132,7 +1132,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
     assert.equal(inv.rows.length, 1);
 
     const sales = await h.reportsService.queryDomainReport(
-      tenantA,
+      orgA,
       ReportDomain.SALES_MPESA,
       {},
     );
@@ -1141,7 +1141,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
     assert.equal(sales.summaryKpis.mpesaSettledAmount, "250.00");
 
     const proc = await h.reportsService.queryDomainReport(
-      tenantA,
+      orgA,
       ReportDomain.PROCUREMENT_CLAIMS,
       {},
     );
@@ -1150,7 +1150,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
     assert.equal(proc.summaryKpis.openClaimCount, 1);
 
     const prod = await h.reportsService.queryDomainReport(
-      tenantA,
+      orgA,
       ReportDomain.PRODUCTION_COSTING,
       {},
     );
@@ -1163,7 +1163,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
     assert.equal(sanitizeCsvCell(-125), "-125");
 
     const csvExport = await h.reportsService.exportReport(
-      tenantA,
+      orgA,
       ReportDomain.PROCUREMENT_CLAIMS,
       ReportFormat.CSV,
       {},
@@ -1172,7 +1172,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
 
     // Verify PDF export header & EOF structure
     const pdfExport = await h.reportsService.exportReport(
-      tenantA,
+      orgA,
       ReportDomain.PRODUCTION_COSTING,
       ReportFormat.PDF,
       {},
@@ -1192,7 +1192,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
     );
     assert.equal(nextDaily.toISOString(), "2026-11-27T06:00:00.000Z");
 
-    const sched = await h.reportsService.createSchedule(tenantA, {
+    const sched = await h.reportsService.createSchedule(orgA, {
       name: "Daily Sales & M-Pesa Close",
       domain: ReportDomain.SALES_MPESA,
       format: ReportFormat.PDF,
@@ -1202,7 +1202,7 @@ describe("Multi-Domain Operational Reporting, Exports & Schedules", () => {
       channelHints: [CommunicationChannel.EMAIL, CommunicationChannel.IN_APP],
     });
 
-    const runOutcome = await h.reportsService.runScheduleNow(tenantA, sched.id);
+    const runOutcome = await h.reportsService.runScheduleNow(orgA, sched.id);
     assert.equal(runOutcome.run.status, "COMPLETED");
     assert.equal(runOutcome.run.rowCount, 1);
     assert.ok(runOutcome.outboxEventId);

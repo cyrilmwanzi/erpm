@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { DepartmentStatus, type Prisma } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { assertNoHierarchyCycle } from "./staff.utils.js";
 
 export interface CreateDepartmentInput {
@@ -92,7 +92,7 @@ export class DepartmentsService {
   }
 
   async createDepartment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateDepartmentInput,
     ipAddress?: string,
   ) {
@@ -163,7 +163,7 @@ export class DepartmentsService {
   }
 
   async listDepartments(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListDepartmentsQuery,
   ) {
     const take = Math.min(Math.max(query.limit, 1), 100);
@@ -209,7 +209,7 @@ export class DepartmentsService {
     };
   }
 
-  async getDepartment(tenant: AuthenticatedTenant, departmentId: string) {
+  async getDepartment(tenant: AuthenticatedOrganization, departmentId: string) {
     const dept = await this.prismaService.scoped.department.findFirst({
       where: { id: departmentId, organizationId: tenant.organizationId },
       include: {
@@ -232,7 +232,7 @@ export class DepartmentsService {
   }
 
   async updateDepartment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     departmentId: string,
     input: UpdateDepartmentInput,
     ipAddress?: string,
@@ -335,7 +335,7 @@ export class DepartmentsService {
   }
 
   async archiveDepartment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     departmentId: string,
     ipAddress?: string,
   ) {
@@ -378,7 +378,7 @@ export class DepartmentsService {
     });
   }
 
-  async getDepartmentTree(tenant: AuthenticatedTenant) {
+  async getDepartmentTree(tenant: AuthenticatedOrganization) {
     const rows = await this.prismaService.scoped.department.findMany({
       where: {
         organizationId: tenant.organizationId,

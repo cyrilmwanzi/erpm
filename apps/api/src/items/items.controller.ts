@@ -19,11 +19,11 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ItemsService } from "./items.service.js";
 
 const itemTypeEnum = z.enum([
@@ -160,7 +160,7 @@ const historyQuerySchema = z.object({
 });
 
 @Controller("api/v1/items")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class ItemsController {
   constructor(
     @Inject(ItemsService) private readonly itemsService: ItemsService,
@@ -169,7 +169,7 @@ export class ItemsController {
   @Post()
   @RequiredOrgPermissions({ item: ["create"] })
   async createItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -187,7 +187,7 @@ export class ItemsController {
   @Get()
   @RequiredOrgPermissions({ item: ["read"] })
   async listItems(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listItemsQuerySchema.safeParse(query ?? {});
@@ -204,7 +204,7 @@ export class ItemsController {
   @Get(":itemId")
   @RequiredOrgPermissions({ item: ["read"] })
   async getItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
   ) {
     return this.itemsService.getItem(tenant, itemId);
@@ -213,7 +213,7 @@ export class ItemsController {
   @Patch(":itemId")
   @RequiredOrgPermissions({ item: ["update"] })
   async updateItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -232,7 +232,7 @@ export class ItemsController {
   @Post(":itemId/archive")
   @RequiredOrgPermissions({ item: ["archive"] })
   async archiveItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -256,7 +256,7 @@ export class ItemsController {
   @Post(":itemId/restore")
   @RequiredOrgPermissions({ item: ["archive"] })
   async restoreItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -281,7 +281,7 @@ export class ItemsController {
   @Get(":itemId/history")
   @RequiredOrgPermissions({ item: ["read"] })
   async listItemHistory(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Query() query: unknown,
   ) {

@@ -5,7 +5,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { PlatformRole } from "@scace/db";
-import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
+import type { OrganizationScopedRequest } from "../organizations/organization.decorators.js";
 import { SystemAdminGuard } from "./system-admin.guard.js";
 
 export interface AuthenticatedSystemAdmin {
@@ -15,7 +15,7 @@ export interface AuthenticatedSystemAdmin {
   platformRole: PlatformRole;
 }
 
-export type SystemAdminRequest = TenantScopedRequest & {
+export type SystemAdminRequest = OrganizationScopedRequest & {
   systemAdmin?: AuthenticatedSystemAdmin;
 };
 

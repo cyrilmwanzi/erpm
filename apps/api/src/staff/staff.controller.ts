@@ -14,11 +14,11 @@ import { EmploymentType, StaffStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ScheduleLeaveService } from "./schedule-leave.service.js";
 import { StaffService } from "./staff.service.js";
 
@@ -117,7 +117,7 @@ const assignScheduleSchema = z.object({
 });
 
 @Controller("api/v1/staff")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class StaffController {
   constructor(
     @Inject(StaffService) private readonly staffService: StaffService,
@@ -127,14 +127,14 @@ export class StaffController {
 
   @Get("me")
   @RequiredOrgPermissions({ staff: ["read"] })
-  async getMyProfile(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getMyProfile(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.staffService.getOrCreateMyProfile(tenant);
   }
 
   @Patch("me")
   @RequiredOrgPermissions({ staff: ["selfUpdate"] })
   async updateMyProfile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -150,14 +150,14 @@ export class StaffController {
 
   @Get("org-chart")
   @RequiredOrgPermissions({ staff: ["read"] })
-  async getOrgChart(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getOrgChart(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.staffService.getOrgChart(tenant);
   }
 
   @Post("sync-members")
   @RequiredOrgPermissions({ staff: ["create"] })
   async syncMembersToStaff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.staffService.syncMembersToStaff(tenant, req.ip);
@@ -166,7 +166,7 @@ export class StaffController {
   @Post()
   @RequiredOrgPermissions({ staff: ["create"] })
   async createStaff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -183,7 +183,7 @@ export class StaffController {
   @Get()
   @RequiredOrgPermissions({ staff: ["read"] })
   async listStaff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listStaffQuerySchema.safeParse(query ?? {});
@@ -199,7 +199,7 @@ export class StaffController {
   @Get(":staffId")
   @RequiredOrgPermissions({ staff: ["read"] })
   async getStaff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("staffId") staffId: string,
   ) {
     return this.staffService.getStaffById(tenant, staffId);
@@ -208,7 +208,7 @@ export class StaffController {
   @Patch(":staffId")
   @RequiredOrgPermissions({ staff: ["update"] })
   async updateStaff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("staffId") staffId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -226,7 +226,7 @@ export class StaffController {
   @Post(":staffId/offboard")
   @RequiredOrgPermissions({ staff: ["archive"] })
   async offboardStaff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("staffId") staffId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -250,7 +250,7 @@ export class StaffController {
   @Post(":staffId/schedule")
   @RequiredOrgPermissions({ staff: ["update"] })
   async assignSchedule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("staffId") staffId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

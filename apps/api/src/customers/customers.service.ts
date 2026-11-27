@@ -10,12 +10,12 @@ import {
   CustomerStatus,
   CustomerType,
   Prisma,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { CrmConnectionService } from "../crm/crm-connection.service.js";
 import { CustomerMatesClient } from "../crm/customermates.client.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface CreateCustomerInput {
   code?: string;
@@ -131,7 +131,7 @@ export class CustomersService {
   ) {}
 
   async createCustomer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateCustomerInput,
     ipAddress?: string,
   ) {
@@ -144,7 +144,7 @@ export class CustomersService {
 
     try {
       return await this.prismaService.raw.$transaction(async (tx) => {
-        const settings = await tx.tenantSettings.findUnique({
+        const settings = await tx.organizationSettings.findUnique({
           where: { organizationId },
           select: { defaultCurrency: true },
         });
@@ -229,7 +229,7 @@ export class CustomersService {
     }
   }
 
-  async listCustomers(tenant: AuthenticatedTenant, query: ListCustomersQuery) {
+  async listCustomers(tenant: AuthenticatedOrganization, query: ListCustomersQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -289,7 +289,7 @@ export class CustomersService {
     };
   }
 
-  async getCustomer(tenant: AuthenticatedTenant, customerId: string) {
+  async getCustomer(tenant: AuthenticatedOrganization, customerId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const customer = await this.prismaService.scoped.customer.findUnique({
       where: { id: customerId },
@@ -308,7 +308,7 @@ export class CustomersService {
   }
 
   async updateCustomer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     customerId: string,
     input: UpdateCustomerInput,
     ipAddress?: string,
@@ -443,7 +443,7 @@ export class CustomersService {
   }
 
   async archiveCustomer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     customerId: string,
     ipAddress?: string,
   ) {
@@ -487,7 +487,7 @@ export class CustomersService {
   }
 
   async restoreCustomer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     customerId: string,
     status: "ACTIVE" | "INACTIVE" = "ACTIVE",
     ipAddress?: string,
@@ -532,7 +532,7 @@ export class CustomersService {
   }
 
   async linkCustomerToCrm(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     customerId: string,
     input: LinkCustomerCrmInput,
     ipAddress?: string,
@@ -674,7 +674,7 @@ export class CustomersService {
   }
 
   async importCustomerFromCrm(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: ImportCustomerFromCrmInput,
     ipAddress?: string,
   ) {
@@ -820,10 +820,10 @@ export class CustomersService {
     return null;
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

@@ -14,12 +14,12 @@ import {
   Prisma,
   PurchaseOrderStatus,
   SupplierStatus,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { PricingEngineService } from "../pricing/pricing-engine.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { DeliveriesService } from "./deliveries.service.js";
 import { computePoLineCapacity, decomposeBaseToBulk } from "./delivery-units.utils.js";
 
@@ -109,7 +109,7 @@ export class PurchaseOrdersService {
   ) {}
 
   async createPurchaseOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreatePurchaseOrderInput,
     ipAddress?: string,
   ) {
@@ -326,7 +326,7 @@ export class PurchaseOrdersService {
   }
 
   async listPurchaseOrders(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListPurchaseOrdersQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -362,7 +362,7 @@ export class PurchaseOrdersService {
     };
   }
 
-  async getPurchaseOrder(tenant: AuthenticatedTenant, poId: string) {
+  async getPurchaseOrder(tenant: AuthenticatedOrganization, poId: string) {
     this.resolveVerifiedOrganizationId(tenant);
 
     const po = await this.prismaService.scoped.purchaseOrder.findUnique({
@@ -449,7 +449,7 @@ export class PurchaseOrdersService {
   }
 
   async updateDraftPurchaseOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     poId: string,
     input: UpdatePurchaseOrderInput,
     ipAddress?: string,
@@ -653,7 +653,7 @@ export class PurchaseOrdersService {
   }
 
   async submitPurchaseOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     poId: string,
     ipAddress?: string,
   ) {
@@ -742,7 +742,7 @@ export class PurchaseOrdersService {
   }
 
   async cancelPurchaseOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     poId: string,
     reason?: string,
     ipAddress?: string,
@@ -827,7 +827,7 @@ export class PurchaseOrdersService {
   }
 
   async receiveGoods(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     poId: string,
     input: ReceiveGoodsInput,
     ipAddress?: string,
@@ -874,10 +874,10 @@ export class PurchaseOrdersService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

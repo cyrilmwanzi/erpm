@@ -14,11 +14,11 @@ import { CustomerStatus, CustomerType } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { CustomersService } from "./customers.service.js";
 
 const currencySchema = z
@@ -107,7 +107,7 @@ const importCrmSchema = z.object({
 });
 
 @Controller("api/v1/customers")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class CustomersController {
   constructor(
     @Inject(CustomersService)
@@ -117,7 +117,7 @@ export class CustomersController {
   @Post()
   @RequiredOrgPermissions({ customer: ["create"] })
   async createCustomer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -135,7 +135,7 @@ export class CustomersController {
   @Get()
   @RequiredOrgPermissions({ customer: ["read"] })
   async listCustomers(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listCustomersQuerySchema.safeParse(query ?? {});
@@ -152,7 +152,7 @@ export class CustomersController {
   @Post("crm-import")
   @RequiredOrgPermissions({ customer: ["create"] })
   async importCustomerFromCrm(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -174,7 +174,7 @@ export class CustomersController {
   @Get(":customerId")
   @RequiredOrgPermissions({ customer: ["read"] })
   async getCustomer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("customerId") customerId: string,
   ) {
     return this.customersService.getCustomer(tenant, customerId);
@@ -183,7 +183,7 @@ export class CustomersController {
   @Patch(":customerId")
   @RequiredOrgPermissions({ customer: ["update"] })
   async updateCustomer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("customerId") customerId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -207,7 +207,7 @@ export class CustomersController {
   @Post(":customerId/archive")
   @RequiredOrgPermissions({ customer: ["archive"] })
   async archiveCustomer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("customerId") customerId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -217,7 +217,7 @@ export class CustomersController {
   @Post(":customerId/restore")
   @RequiredOrgPermissions({ customer: ["archive"] })
   async restoreCustomer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("customerId") customerId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -241,7 +241,7 @@ export class CustomersController {
   @Post(":customerId/crm-link")
   @RequiredOrgPermissions({ customer: ["update"] })
   async linkCustomerToCrm(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("customerId") customerId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

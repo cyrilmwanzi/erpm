@@ -13,7 +13,7 @@ import {
   StaffStatus,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   assertNoHierarchyCycle,
   DEFAULT_WORKING_DAYS,
@@ -267,7 +267,7 @@ export class StaffService {
   }
 
   async createStaff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateStaffInput,
     ipAddress?: string,
   ) {
@@ -391,7 +391,7 @@ export class StaffService {
     });
   }
 
-  async syncMembersToStaff(tenant: AuthenticatedTenant, ipAddress?: string) {
+  async syncMembersToStaff(tenant: AuthenticatedOrganization, ipAddress?: string) {
     return this.prismaService.raw.$transaction(async (tx) => {
       const members = await tx.member.findMany({
         where: { organizationId: tenant.organizationId },
@@ -484,7 +484,7 @@ export class StaffService {
     });
   }
 
-  async listStaff(tenant: AuthenticatedTenant, query: ListStaffQuery) {
+  async listStaff(tenant: AuthenticatedOrganization, query: ListStaffQuery) {
     const take = Math.min(Math.max(query.limit, 1), 100);
     const where: Prisma.StaffProfileWhereInput = {
       organizationId: tenant.organizationId,
@@ -535,7 +535,7 @@ export class StaffService {
     };
   }
 
-  async getStaffById(tenant: AuthenticatedTenant, staffId: string) {
+  async getStaffById(tenant: AuthenticatedOrganization, staffId: string) {
     const staff = await this.prismaService.scoped.staffProfile.findFirst({
       where: { id: staffId, organizationId: tenant.organizationId },
       include: {
@@ -566,7 +566,7 @@ export class StaffService {
     return staff;
   }
 
-  async getOrCreateMyProfile(tenant: AuthenticatedTenant) {
+  async getOrCreateMyProfile(tenant: AuthenticatedOrganization) {
     const existing = await this.prismaService.scoped.staffProfile.findFirst({
       where: {
         organizationId: tenant.organizationId,
@@ -662,7 +662,7 @@ export class StaffService {
   }
 
   async updateMyProfile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: SelfUpdateStaffInput,
     ipAddress?: string,
   ) {
@@ -720,7 +720,7 @@ export class StaffService {
   }
 
   async updateStaff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     staffId: string,
     input: UpdateStaffInput,
     ipAddress?: string,
@@ -901,7 +901,7 @@ export class StaffService {
   }
 
   async offboardStaff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     staffId: string,
     endDate?: string,
     reason?: string,
@@ -956,7 +956,7 @@ export class StaffService {
     });
   }
 
-  async getOrgChart(tenant: AuthenticatedTenant) {
+  async getOrgChart(tenant: AuthenticatedOrganization) {
     const rows = await this.prismaService.scoped.staffProfile.findMany({
       where: {
         organizationId: tenant.organizationId,

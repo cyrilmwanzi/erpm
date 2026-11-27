@@ -10,7 +10,7 @@ import { type Prisma } from "@scace/db";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   decodeJwt,
   decryptAuthSecret,
@@ -631,7 +631,7 @@ export class OAuthProviderService {
   }
 
   async authorizePkce(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: {
       clientId: string;
       redirectUri: string;
@@ -790,7 +790,7 @@ export class OAuthProviderService {
   }
 
   async verifyDeviceCode(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: {
       userCode: string;
       decision: "APPROVE" | "DENY";

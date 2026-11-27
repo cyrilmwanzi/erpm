@@ -10,13 +10,13 @@ import {
   LocationStatus,
   LocationType,
   Prisma,
-  TenantContext,
+  OrganizationContext,
   type Location,
 } from "@scace/db";
 import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface CreateLocationInput {
   code: string;
@@ -94,7 +94,7 @@ export class LocationsService {
   ) {}
 
   async createLocation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateLocationInput,
     ipAddress?: string,
   ): Promise<Location> {
@@ -176,7 +176,7 @@ export class LocationsService {
     }
   }
 
-  async listLocations(tenant: AuthenticatedTenant, query: ListLocationsQuery) {
+  async listLocations(tenant: AuthenticatedOrganization, query: ListLocationsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -214,11 +214,11 @@ export class LocationsService {
   }
 
   async getLocation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     locationId: string,
   ): Promise<Location> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
-    const cacheKey = `tenant:${organizationId}:location:${locationId}`;
+    const cacheKey = `org:${organizationId}:location:${locationId}`;
 
     try {
       const cached = await this.redisService.getJson<Location>(cacheKey);
@@ -247,7 +247,7 @@ export class LocationsService {
   }
 
   async updateLocation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     locationId: string,
     input: UpdateLocationInput,
     ipAddress?: string,
@@ -349,7 +349,7 @@ export class LocationsService {
   }
 
   async archiveLocation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     locationId: string,
     reason?: string,
     ipAddress?: string,
@@ -404,7 +404,7 @@ export class LocationsService {
   }
 
   async restoreLocation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     locationId: string,
     targetStatus: "ACTIVE" | "INACTIVE" = LocationStatus.ACTIVE,
     reason?: string,
@@ -458,10 +458,10 @@ export class LocationsService {
     return restored;
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
@@ -471,7 +471,7 @@ export class LocationsService {
     locationId: string,
   ): Promise<void> {
     try {
-      await this.redisService.invalidateTenantCache(
+      await this.redisService.invalidateOrganizationCache(
         organizationId,
         `location:${locationId}`,
       );

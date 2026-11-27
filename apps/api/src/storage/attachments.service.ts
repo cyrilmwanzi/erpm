@@ -14,7 +14,7 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { StorageService } from "./storage.service.js";
 
 export const attachmentDocumentTypeEnum = z.enum([
@@ -121,7 +121,7 @@ export class AttachmentsService {
 
   async attachStoredObject(
     db: DbClient,
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: {
       storedObjectId: string;
       documentType?: AttachmentDocumentType;
@@ -271,7 +271,7 @@ export class AttachmentsService {
   }
 
   async uploadAndAttach(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: {
       buffer: Buffer;
       filename: string;
@@ -316,7 +316,7 @@ export class AttachmentsService {
   }
 
   async handleUploadOrLinkRequest(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     req: FastifyRequest,
     body: unknown,
     options: {
@@ -388,7 +388,7 @@ export class AttachmentsService {
     );
   }
 
-  async listForDelivery(tenant: AuthenticatedTenant, deliveryId: string) {
+  async listForDelivery(tenant: AuthenticatedOrganization, deliveryId: string) {
     const receipt = await this.prismaService.scoped.goodsReceipt.findFirst({
       where: { id: deliveryId, organizationId: tenant.organizationId },
       select: { id: true, receiptNumber: true },
@@ -429,7 +429,7 @@ export class AttachmentsService {
   }
 
   async listForTarget(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     where: Prisma.DocumentAttachmentWhereInput,
   ) {
     const attachments = await this.prismaService.scoped.documentAttachment.findMany(
@@ -445,7 +445,7 @@ export class AttachmentsService {
   }
 
   async removeAttachment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     attachmentId: string,
     filter?: Prisma.DocumentAttachmentWhereInput,
     ipAddress?: string,

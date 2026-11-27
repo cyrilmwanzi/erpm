@@ -21,12 +21,12 @@ import {
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ReportsService } from "./reports.service.js";
 
 const reportDomainEnum = z.enum([
@@ -116,7 +116,7 @@ const listRunsQuerySchema = z.object({
 });
 
 @Controller("api/v1/reports")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("reports")
 export class ReportsController {
   constructor(
@@ -126,7 +126,7 @@ export class ReportsController {
   @Get("inventory-expiry")
   @RequiredOrgPermissions({ report: ["read"] })
   async getInventoryExpiryReport(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = reportFilterFieldsSchema.safeParse(query ?? {});
@@ -146,7 +146,7 @@ export class ReportsController {
   @Get("sales-mpesa")
   @RequiredOrgPermissions({ report: ["read"] })
   async getSalesMpesaReport(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = reportFilterFieldsSchema.safeParse(query ?? {});
@@ -166,7 +166,7 @@ export class ReportsController {
   @Get("procurement-claims")
   @RequiredOrgPermissions({ report: ["read"] })
   async getProcurementClaimsReport(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = reportFilterFieldsSchema.safeParse(query ?? {});
@@ -186,7 +186,7 @@ export class ReportsController {
   @Get("production-costing")
   @RequiredOrgPermissions({ report: ["read"] })
   async getProductionCostingReport(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = reportFilterFieldsSchema.safeParse(query ?? {});
@@ -206,7 +206,7 @@ export class ReportsController {
   @Get("export")
   @RequiredOrgPermissions({ report: ["export"] })
   async exportReport(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
@@ -241,7 +241,7 @@ export class ReportsController {
   @Post("dispatch")
   @RequiredOrgPermissions({ report: ["export"] })
   async dispatchReport(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -257,14 +257,14 @@ export class ReportsController {
 
   @Get("schedules")
   @RequiredOrgPermissions({ report: ["read"] })
-  async listSchedules(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async listSchedules(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.reportsService.listSchedules(tenant);
   }
 
   @Post("schedules")
   @RequiredOrgPermissions({ report: ["schedule"] })
   async createSchedule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -281,7 +281,7 @@ export class ReportsController {
   @Patch("schedules/:scheduleId")
   @RequiredOrgPermissions({ report: ["schedule"] })
   async updateSchedule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("scheduleId") scheduleId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -304,7 +304,7 @@ export class ReportsController {
   @Delete("schedules/:scheduleId")
   @RequiredOrgPermissions({ report: ["schedule"] })
   async deleteSchedule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("scheduleId") scheduleId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -314,7 +314,7 @@ export class ReportsController {
   @Post("schedules/:scheduleId/run-now")
   @RequiredOrgPermissions({ report: ["schedule"] })
   async runScheduleNow(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("scheduleId") scheduleId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -324,7 +324,7 @@ export class ReportsController {
   @Get("runs")
   @RequiredOrgPermissions({ report: ["read"] })
   async listRuns(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listRunsQuerySchema.safeParse(query ?? {});
@@ -340,7 +340,7 @@ export class ReportsController {
   @Get("runs/:runId")
   @RequiredOrgPermissions({ report: ["read"] })
   async getRun(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("runId") runId: string,
   ) {
     return this.reportsService.getRun(tenant, runId);
@@ -349,7 +349,7 @@ export class ReportsController {
   @Get("runs/:runId/download")
   @RequiredOrgPermissions({ report: ["export"] })
   async downloadRunArtifact(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("runId") runId: string,
     @Res() reply: FastifyReply,
   ) {

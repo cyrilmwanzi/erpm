@@ -23,7 +23,7 @@ import {
   ProductionQcStatus,
   StockMovementType,
   StorageEntityType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
@@ -38,7 +38,7 @@ import {
   AttachmentsService,
   STORED_OBJECT_SUMMARY_SELECT,
 } from "../storage/attachments.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   computeTimeLogCosts,
   recalculateBatchCosting,
@@ -139,7 +139,7 @@ export class ProductionExecutionService {
 
   async reserveBatchMaterialsTx(
     tx: Prisma.TransactionClient,
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     strictStockCheck = true,
   ) {
@@ -268,7 +268,7 @@ export class ProductionExecutionService {
 
   async consumeMaterialLineTx(
     tx: Prisma.TransactionClient,
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batch: {
       id: string;
       batchNumber: string;
@@ -662,7 +662,7 @@ export class ProductionExecutionService {
 
   async backflushReservationsTx(
     tx: Prisma.TransactionClient,
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batch: { id: string; batchNumber: string; locationId: string },
     options: {
       operationSequence?: number | null;
@@ -727,7 +727,7 @@ export class ProductionExecutionService {
   // ==========================================
 
   async scheduleBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: ScheduleBatchInput,
     ipAddress?: string,
@@ -907,7 +907,7 @@ export class ProductionExecutionService {
   }
 
   async getWorkCenterDispatchQueue(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     workCenterId: string,
     query: DispatchQueueQuery,
   ) {
@@ -1011,7 +1011,7 @@ export class ProductionExecutionService {
   // Operations & Labor Time Logs
   // ==========================================
 
-  async listOperations(tenant: AuthenticatedTenant, batchId: string) {
+  async listOperations(tenant: AuthenticatedOrganization, batchId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const batch = await this.prismaService.scoped.productionBatch.findFirst({
       where: { id: batchId, organizationId },
@@ -1035,7 +1035,7 @@ export class ProductionExecutionService {
   }
 
   async getOperation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
   ) {
@@ -1051,7 +1051,7 @@ export class ProductionExecutionService {
   }
 
   async startOperation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
     assignedStaffId?: string | null,
@@ -1147,7 +1147,7 @@ export class ProductionExecutionService {
   }
 
   async pauseOperation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
     ipAddress?: string,
@@ -1193,7 +1193,7 @@ export class ProductionExecutionService {
   }
 
   async logTime(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
     input: LogOperationTimeInput,
@@ -1358,7 +1358,7 @@ export class ProductionExecutionService {
   }
 
   async completeOperation(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
     input: CompleteOperationInput,
@@ -1559,7 +1559,7 @@ export class ProductionExecutionService {
   }
 
   async listOperationFiles(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
   ) {
@@ -1583,7 +1583,7 @@ export class ProductionExecutionService {
   }
 
   async addOperationFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
     req: FastifyRequest,
@@ -1606,7 +1606,7 @@ export class ProductionExecutionService {
   }
 
   async removeOperationFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     operationId: string,
     attachmentId: string,
@@ -1633,7 +1633,7 @@ export class ProductionExecutionService {
   // ==========================================
 
   async createQcCheckpoint(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: CreateQcCheckpointInput,
     ipAddress?: string,
@@ -1713,7 +1713,7 @@ export class ProductionExecutionService {
   }
 
   async inspectQcCheckpoint(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     checkpointId: string,
     input: InspectQcCheckpointInput,
@@ -1831,7 +1831,7 @@ export class ProductionExecutionService {
   }
 
   async qcReleaseBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: QcReleaseBatchInput,
     ipAddress?: string,
@@ -2059,7 +2059,7 @@ export class ProductionExecutionService {
   }
 
   async listQcCheckpointFiles(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     checkpointId: string,
   ) {
@@ -2083,7 +2083,7 @@ export class ProductionExecutionService {
   }
 
   async addQcCheckpointFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     checkpointId: string,
     req: FastifyRequest,
@@ -2106,7 +2106,7 @@ export class ProductionExecutionService {
   }
 
   async removeQcCheckpointFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     checkpointId: string,
     attachmentId: string,
@@ -2133,7 +2133,7 @@ export class ProductionExecutionService {
   // ==========================================
 
   async addCostEntry(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: AddCostEntryInput,
     ipAddress?: string,
@@ -2192,7 +2192,7 @@ export class ProductionExecutionService {
     });
   }
 
-  async getBatchCosting(tenant: AuthenticatedTenant, batchId: string) {
+  async getBatchCosting(tenant: AuthenticatedOrganization, batchId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     return this.prismaService.raw.$transaction(async (tx) => {
@@ -2212,7 +2212,7 @@ export class ProductionExecutionService {
   }
 
   async closeBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     ipAddress?: string,
   ) {
@@ -2273,7 +2273,7 @@ export class ProductionExecutionService {
   // Electronic Batch Record (eBR)
   // ==========================================
 
-  async getElectronicBatchRecord(tenant: AuthenticatedTenant, batchId: string) {
+  async getElectronicBatchRecord(tenant: AuthenticatedOrganization, batchId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const batch = await this.prismaService.scoped.productionBatch.findFirst({
@@ -2573,10 +2573,10 @@ export class ProductionExecutionService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

@@ -8,10 +8,10 @@ import {
   BillingInvoiceStatus,
   Prisma,
   SubscriptionBillingCycle,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { provisionPlatformBillingDefaults } from "./billing-bootstrap.service.js";
 import { BillingEnforcementService } from "./billing-enforcement.service.js";
 import {
@@ -50,7 +50,7 @@ export class OrgBillingService {
     private readonly platformMpesaService: PlatformMpesaService,
   ) {}
 
-  async getSubscriptionOverview(tenant: AuthenticatedTenant) {
+  async getSubscriptionOverview(tenant: AuthenticatedOrganization) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const entitlement =
       await this.billingEnforcement.evaluateOrganizationEntitlement(organizationId, {
@@ -70,7 +70,7 @@ export class OrgBillingService {
     };
   }
 
-  async getBillingOptions(tenant: AuthenticatedTenant) {
+  async getBillingOptions(tenant: AuthenticatedOrganization) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const [{ config }, entitlement, plans, mpesaConfig] = await Promise.all([
       provisionPlatformBillingDefaults(this.prismaService.raw),
@@ -126,7 +126,7 @@ export class OrgBillingService {
     };
   }
 
-  async listInvoices(tenant: AuthenticatedTenant, limit = 25) {
+  async listInvoices(tenant: AuthenticatedOrganization, limit = 25) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const invoices = await this.prismaService.raw.billingInvoice.findMany({
       where: { organizationId },
@@ -142,7 +142,7 @@ export class OrgBillingService {
     };
   }
 
-  async listPayments(tenant: AuthenticatedTenant, limit = 25) {
+  async listPayments(tenant: AuthenticatedOrganization, limit = 25) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const payments =
       await this.prismaService.raw.billingPaymentTransaction.findMany({
@@ -169,7 +169,7 @@ export class OrgBillingService {
   }
 
   async createCheckoutInvoice(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: OrgCheckoutInput,
     ipAddress?: string,
   ) {
@@ -298,7 +298,7 @@ export class OrgBillingService {
   }
 
   async initiateMpesaPayment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: OrgMpesaStkPushInput,
     ipAddress?: string,
   ) {
@@ -355,7 +355,7 @@ export class OrgBillingService {
   }
 
   async queryMpesaPaymentStatus(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     transactionId: string,
     ipAddress?: string,
   ) {
@@ -369,7 +369,7 @@ export class OrgBillingService {
   }
 
   async simulateMpesaCallback(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: {
       transactionId: string;
       outcome?: "SUCCESS" | "CANCELLED" | "FAILED" | "TIMEOUT";
@@ -390,10 +390,10 @@ export class OrgBillingService {
     });
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

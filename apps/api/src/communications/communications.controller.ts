@@ -20,12 +20,12 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { CommunicationOutboxService } from "./communication-outbox.service.js";
 
 const eventTypeEnum = z.enum([
@@ -136,7 +136,7 @@ const updateWebhookSchema = z.object({
 });
 
 @Controller("api/v1/communications")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("communications")
 export class CommunicationsController {
   constructor(
@@ -147,7 +147,7 @@ export class CommunicationsController {
   @Get("outbox")
   @RequiredOrgPermissions({ communication: ["read"] })
   async listOutboxEvents(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listOutboxQuerySchema.safeParse(query ?? {});
@@ -163,7 +163,7 @@ export class CommunicationsController {
   @Get("outbox/:eventId")
   @RequiredOrgPermissions({ communication: ["read"] })
   async getOutboxEvent(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("eventId") eventId: string,
   ) {
     return this.outboxService.getOutboxEvent(tenant, eventId);
@@ -172,7 +172,7 @@ export class CommunicationsController {
   @Post("outbox/dispatch")
   @RequiredOrgPermissions({ communication: ["dispatch"] })
   async dispatchOutboxNow(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = dispatchOutboxSchema.safeParse(body ?? {});
@@ -191,7 +191,7 @@ export class CommunicationsController {
   @Post("outbox/claim")
   @RequiredOrgPermissions({ communication: ["dispatch"] })
   async claimOutboxEvents(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = claimOutboxSchema.safeParse(body ?? {});
@@ -207,7 +207,7 @@ export class CommunicationsController {
   @Post("outbox/:eventId/acknowledge")
   @RequiredOrgPermissions({ communication: ["dispatch"] })
   async acknowledgeOutboxEvent(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("eventId") eventId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -230,7 +230,7 @@ export class CommunicationsController {
   @Post("outbox/:eventId/retry")
   @RequiredOrgPermissions({ communication: ["dispatch"] })
   async retryOutboxEvent(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("eventId") eventId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -239,14 +239,14 @@ export class CommunicationsController {
 
   @Get("rules")
   @RequiredOrgPermissions({ communication: ["read"] })
-  async listAlertRules(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async listAlertRules(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.outboxService.listAlertRules(tenant);
   }
 
   @Post("rules")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async createAlertRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -263,7 +263,7 @@ export class CommunicationsController {
   @Patch("rules/:ruleId")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async updateAlertRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("ruleId") ruleId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -286,7 +286,7 @@ export class CommunicationsController {
   @Delete("rules/:ruleId")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async deleteAlertRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("ruleId") ruleId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -295,14 +295,14 @@ export class CommunicationsController {
 
   @Get("webhooks")
   @RequiredOrgPermissions({ communication: ["read"] })
-  async listWebhooks(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async listWebhooks(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.outboxService.listWebhooks(tenant);
   }
 
   @Post("webhooks")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async createWebhook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -319,7 +319,7 @@ export class CommunicationsController {
   @Patch("webhooks/:webhookId")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async updateWebhook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("webhookId") webhookId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -342,7 +342,7 @@ export class CommunicationsController {
   @Post("webhooks/:webhookId/rotate-secret")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async rotateWebhookSecret(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("webhookId") webhookId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -352,7 +352,7 @@ export class CommunicationsController {
   @Post("webhooks/:webhookId/test")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async testWebhook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("webhookId") webhookId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -362,7 +362,7 @@ export class CommunicationsController {
   @Delete("webhooks/:webhookId")
   @RequiredOrgPermissions({ communication: ["manage"] })
   async deleteWebhook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("webhookId") webhookId: string,
     @Req() req: FastifyRequest,
   ) {

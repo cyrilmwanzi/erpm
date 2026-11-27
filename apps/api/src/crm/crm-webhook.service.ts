@@ -8,7 +8,7 @@ import {
 import { CrmWebhookStatus, type Prisma } from "@scace/db";
 import type { IncomingHttpHeaders } from "node:http";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   decryptCrmSecret,
   verifyHmacSha256Signature,
@@ -193,7 +193,7 @@ export class CrmWebhookService {
   }
 
   async listWebhookEvents(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListWebhookEventsQuery,
   ) {
     const take = Math.min(Math.max(query.limit, 1), 100);

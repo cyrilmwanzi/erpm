@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --docs-bg: #ffffff;
+    --docs-surface: #f8fafc;
+    --docs-surface-hover: #f1f5f9;
+    --docs-border: #e2e8f0;
+    --docs-border-subtle: #eef2f6;
+    --docs-text: #0f172a;
+    --docs-text-secondary: #475569;
+    --docs-text-muted: #64748b;
+    --docs-accent: #2563eb;
+    --docs-accent-hover: #1d4ed8;
+    --docs-accent-soft: #eff6ff;
+    --docs-code-bg: #111827;
+    --docs-code-header: #1e293b;
+    --docs-code-border: #1f2937;
+  }
+
+  .dark {
+    --docs-bg: #090d16;
+    --docs-surface: #0f1623;
+    --docs-surface-hover: #162033;
+    --docs-border: #1e293b;
+    --docs-border-subtle: #162032;
+    --docs-text: #f1f5f9;
+    --docs-text-secondary: #cbd5e1;
+    --docs-text-muted: #94a3b8;
+    --docs-accent: #3b82f6;
+    --docs-accent-hover: #60a5fa;
+    --docs-accent-soft: rgba(59, 130, 246, 0.14);
+    --docs-code-bg: #0d1117;
+    --docs-code-header: #161b22;
+    --docs-code-border: #21262d;
+  }
+
+  html {
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: var(--docs-bg);
+    color: var(--docs-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    text-wrap: balance;
+  }
+
+  code,
+  pre,
+  kbd,
+  .font-mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom subtle scrollbars for sidebars and code blocks */
+.docs-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.docs-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 3px;
+}
+
+.docs-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}

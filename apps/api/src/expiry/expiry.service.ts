@@ -17,7 +17,7 @@ import {
   ExpiryEnforcementMode,
   Prisma,
   StockMovementType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { CommunicationOutboxService } from "../communications/communication-outbox.service.js";
 import { getEnv } from "../config/env.js";
@@ -29,7 +29,7 @@ import {
 } from "../locations/lot-allocation.utils.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface UpdateExpiryPolicyInput {
   warningDays?: number;
@@ -203,7 +203,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   // Policy Configuration
   // ==========================================
 
-  async getPolicy(tenant: AuthenticatedTenant) {
+  async getPolicy(tenant: AuthenticatedOrganization) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const existing = await this.prismaService.raw.stockExpiryPolicy.findUnique({
       where: { organizationId },
@@ -225,7 +225,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async updatePolicy(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: UpdateExpiryPolicyInput,
     ipAddress?: string,
   ) {
@@ -321,7 +321,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   // ==========================================
 
   async getSummary(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: { locationId?: string; itemId?: string } = {},
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -405,7 +405,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async listLots(tenant: AuthenticatedTenant, query: ListExpiryLotsQuery) {
+  async listLots(tenant: AuthenticatedOrganization, query: ListExpiryLotsQuery) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const now = new Date();
@@ -896,7 +896,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async runManualScan(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ipAddress?: string,
   ): Promise<ExpiryScanSummary> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -912,7 +912,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   // Alert Lifecycle Management
   // ==========================================
 
-  async listAlerts(tenant: AuthenticatedTenant, query: ListExpiryAlertsQuery) {
+  async listAlerts(tenant: AuthenticatedOrganization, query: ListExpiryAlertsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
 
@@ -959,7 +959,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async acknowledgeAlert(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     alertId: string,
     notes?: string,
     ipAddress?: string,
@@ -1010,7 +1010,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async resolveAlert(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     alertId: string,
     notes?: string,
     ipAddress?: string,
@@ -1025,7 +1025,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async dismissAlert(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     alertId: string,
     notes?: string,
     ipAddress?: string,
@@ -1040,7 +1040,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async transitionAlertTerminalState(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     alertId: string,
     targetStatus: ExpiryAlertStatus,
     notes?: string,
@@ -1103,7 +1103,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   // ==========================================
 
   async quarantineLot(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     lotId: string,
     input: QuarantineLotInput,
     ipAddress?: string,
@@ -1243,7 +1243,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async writeOffLot(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     lotId: string,
     input: WriteOffLotInput,
     ipAddress?: string,
@@ -1480,7 +1480,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async listWriteOffs(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: { locationId?: string; itemId?: string; limit: number; cursor?: string },
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -1513,7 +1513,7 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async extendLotExpiry(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     lotId: string,
     input: ExtendLotExpiryInput,
     ipAddress?: string,
@@ -1597,10 +1597,10 @@ export class ExpiryService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

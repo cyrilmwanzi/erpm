@@ -15,11 +15,11 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { MpesaPaymentService } from "../payments/mpesa-payment.service.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { InvoicesPaymentsService } from "./invoices-payments.service.js";
 import { OrdersService } from "./orders.service.js";
 
@@ -155,7 +155,7 @@ const listOrdersQuerySchema = z.object({
 });
 
 @Controller("api/v1/orders")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class OrdersController {
   constructor(
     @Inject(OrdersService) private readonly ordersService: OrdersService,
@@ -168,7 +168,7 @@ export class OrdersController {
   @Post("pos/checkout")
   @RequiredOrgPermissions({ order: ["posCheckout"] })
   async posCheckout(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -186,7 +186,7 @@ export class OrdersController {
   @Post("b2b")
   @RequiredOrgPermissions({ order: ["create"] })
   async createB2bOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -204,7 +204,7 @@ export class OrdersController {
   @Get()
   @RequiredOrgPermissions({ order: ["read"] })
   async listOrders(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listOrdersQuerySchema.safeParse(query ?? {});
@@ -221,7 +221,7 @@ export class OrdersController {
   @Get(":orderId")
   @RequiredOrgPermissions({ order: ["read"] })
   async getOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
   ) {
     return this.ordersService.getOrder(tenant, orderId);
@@ -230,7 +230,7 @@ export class OrdersController {
   @Patch(":orderId")
   @RequiredOrgPermissions({ order: ["update"] })
   async updateDraftB2bOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -254,7 +254,7 @@ export class OrdersController {
   @Post(":orderId/confirm")
   @RequiredOrgPermissions({ order: ["confirm"] })
   async confirmB2bOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -278,7 +278,7 @@ export class OrdersController {
   @Post(":orderId/fulfill")
   @RequiredOrgPermissions({ order: ["fulfill"] })
   async fulfillB2bOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -302,7 +302,7 @@ export class OrdersController {
   @Post(":orderId/cancel")
   @RequiredOrgPermissions({ order: ["cancel"] })
   async cancelB2bOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -326,7 +326,7 @@ export class OrdersController {
   @Post(":orderId/invoices")
   @RequiredOrgPermissions({ invoice: ["create"] })
   async createInvoiceFromOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -350,7 +350,7 @@ export class OrdersController {
   @Post(":orderId/payments/mpesa/stk-push")
   @RequiredOrgPermissions({ payment: ["record"] })
   async initiateOrderMpesaStkPush(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("orderId") orderId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

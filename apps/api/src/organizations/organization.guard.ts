@@ -19,11 +19,11 @@ import { RedisService } from "../redis/redis.service.js";
 import {
   BILLING_FEATURE_KEY,
   BILLING_LOCK_EXEMPT_KEY,
-  TENANT_PERMISSIONS_KEY,
-  TENANT_ROLES_KEY,
-  type AuthenticatedTenant,
-  type TenantScopedRequest,
-} from "./tenant.decorators.js";
+  ORG_PERMISSIONS_KEY,
+  ORG_ROLES_KEY,
+  type AuthenticatedOrganization,
+  type OrganizationScopedRequest,
+} from "./organization.decorators.js";
 
 interface CachedMembership {
   memberId: string;
@@ -31,7 +31,7 @@ interface CachedMembership {
 }
 
 @Injectable()
-export class TenantGuard implements CanActivate {
+export class OrganizationGuard implements CanActivate {
   constructor(
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(PrismaService) private readonly prismaService: PrismaService,
@@ -42,7 +42,9 @@ export class TenantGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<TenantScopedRequest>();
+    const request = context
+      .switchToHttp()
+      .getRequest<OrganizationScopedRequest>();
     const reply = context.switchToHttp().getResponse<FastifyReply>();
     const userSession = request.session;
     const authContext = request.authContext;
@@ -51,7 +53,10 @@ export class TenantGuard implements CanActivate {
       throw new UnauthorizedException("Authentication required.");
     }
 
-    if (!authContext?.isServicePrincipal && userSession.user.emailVerified === false) {
+    if (
+      !authContext?.isServicePrincipal &&
+      userSession.user.emailVerified === false
+    ) {
       throw new ForbiddenException(
         "Email verification is required before accessing organization resources.",
       );
@@ -61,7 +66,7 @@ export class TenantGuard implements CanActivate {
       authContext?.organizationId ?? userSession.session?.activeOrganizationId;
     if (!organizationId) {
       throw new ForbiddenException(
-        "No active organization selected. Call /api/auth/organization/set-active before accessing tenant resources.",
+        "No active organization selected. Call /api/auth/organization/set-active before accessing organization resources.",
       );
     }
 
@@ -115,7 +120,7 @@ export class TenantGuard implements CanActivate {
     }
 
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
-      TENANT_ROLES_KEY,
+      ORG_ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
 
@@ -134,7 +139,7 @@ export class TenantGuard implements CanActivate {
 
     const requiredPermissions =
       this.reflector.getAllAndOverride<OrgPermissionRequirement>(
-        TENANT_PERMISSIONS_KEY,
+        ORG_PERMISSIONS_KEY,
         [context.getHandler(), context.getClass()],
       );
 
@@ -199,7 +204,7 @@ export class TenantGuard implements CanActivate {
       }
     }
 
-    const tenant: AuthenticatedTenant = {
+    const organization: AuthenticatedOrganization = {
       organizationId,
       memberId: membership.memberId,
       role: membership.role,
@@ -212,7 +217,7 @@ export class TenantGuard implements CanActivate {
       deviceId: authContext?.deviceId,
       isServicePrincipal: authContext?.isServicePrincipal ?? false,
     };
-    request.tenant = tenant;
+    request.organization = organization;
 
     return true;
   }

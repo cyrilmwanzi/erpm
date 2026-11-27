@@ -5,24 +5,26 @@ import {
   Injectable,
   NestInterceptor,
 } from "@nestjs/common";
-import { TenantContext } from "@scace/db";
+import { OrganizationContext } from "@scace/db";
 import { Observable } from "rxjs";
-import type { TenantScopedRequest } from "./tenant.decorators.js";
+import type { OrganizationScopedRequest } from "./organization.decorators.js";
 
 @Injectable()
-export class TenantInterceptor implements NestInterceptor {
+export class OrganizationInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const request = context.switchToHttp().getRequest<TenantScopedRequest>();
-    const organizationId = request.tenant?.organizationId;
+    const request = context
+      .switchToHttp()
+      .getRequest<OrganizationScopedRequest>();
+    const organizationId = request.organization?.organizationId;
 
     if (!organizationId) {
-      throw new ForbiddenException("Active tenant context is missing.");
+      throw new ForbiddenException("Active organization context is missing.");
     }
 
     return new Observable((subscriber) => {
       let innerSub: { unsubscribe: () => void } | undefined;
 
-      TenantContext.run(organizationId, () => {
+      OrganizationContext.run(organizationId, () => {
         innerSub = next.handle().subscribe({
           next: (value) => subscriber.next(value),
           error: (err) => subscriber.error(err),

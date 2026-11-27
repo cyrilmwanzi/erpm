@@ -8,7 +8,7 @@ import {
 
 export const erpStatements = {
   ...defaultStatements,
-  tenantSettings: ["read", "update"],
+  organizationSettings: ["read", "update"],
   auditLog: ["read"],
   erpWorkspace: ["read", "create", "update", "delete"],
   item: ["read", "create", "update", "archive"],
@@ -53,7 +53,7 @@ export const ac = createAccessControl(erpStatements);
 
 export const owner = ac.newRole({
   ...ownerAc.statements,
-  tenantSettings: ["read", "update"],
+  organizationSettings: ["read", "update"],
   auditLog: ["read"],
   erpWorkspace: ["read", "create", "update", "delete"],
   item: ["read", "create", "update", "archive"],
@@ -90,7 +90,7 @@ export const owner = ac.newRole({
 
 export const admin = ac.newRole({
   ...adminAc.statements,
-  tenantSettings: ["read", "update"],
+  organizationSettings: ["read", "update"],
   auditLog: ["read"],
   erpWorkspace: ["read", "create", "update", "delete"],
   item: ["read", "create", "update", "archive"],
@@ -131,7 +131,7 @@ export const manager = ac.newRole({
   invitation: ["create", "cancel"],
   team: ["read", "create", "update", "archive"],
   ac: ["read"],
-  tenantSettings: ["read"],
+  organizationSettings: ["read"],
   auditLog: ["read"],
   erpWorkspace: ["read", "create", "update"],
   item: ["read", "create", "update", "archive"],
@@ -167,7 +167,7 @@ export const manager = ac.newRole({
 
 export const member = ac.newRole({
   ...memberAc.statements,
-  tenantSettings: ["read"],
+  organizationSettings: ["read"],
   erpWorkspace: ["read", "create", "update"],
   item: ["read", "create", "update"],
   location: ["read"],
@@ -207,7 +207,7 @@ export const viewer = ac.newRole({
   invitation: [],
   team: ["read"],
   ac: ["read"],
-  tenantSettings: ["read"],
+  organizationSettings: ["read"],
   erpWorkspace: ["read"],
   item: ["read"],
   location: ["read"],
@@ -322,7 +322,7 @@ export function getResolvedPermissionsForRole(
     invitation: new Set(),
     team: new Set(),
     ac: new Set(),
-    tenantSettings: new Set(),
+    organizationSettings: new Set(),
     auditLog: new Set(),
     erpWorkspace: new Set(),
     item: new Set(),
@@ -375,7 +375,7 @@ export function getResolvedPermissionsForRole(
     invitation: Array.from(resolved.invitation),
     team: Array.from(resolved.team),
     ac: Array.from(resolved.ac),
-    tenantSettings: Array.from(resolved.tenantSettings),
+    organizationSettings: Array.from(resolved.organizationSettings),
     auditLog: Array.from(resolved.auditLog),
     erpWorkspace: Array.from(resolved.erpWorkspace),
     item: Array.from(resolved.item),

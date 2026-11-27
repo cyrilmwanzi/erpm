@@ -70,8 +70,11 @@ export class RedisService implements OnModuleDestroy {
     await this.client.del(key);
   }
 
-  async invalidateTenantCache(organizationId: string, namespace: string): Promise<void> {
-    await this.del(`tenant:${organizationId}:${namespace}`);
+  async invalidateOrganizationCache(
+    organizationId: string,
+    namespace: string,
+  ): Promise<void> {
+    await this.del(`org:${organizationId}:${namespace}`);
   }
 
   async onModuleDestroy(): Promise<void> {

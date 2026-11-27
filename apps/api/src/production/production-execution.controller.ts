@@ -18,12 +18,12 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ProductionExecutionService } from "./production-execution.service.js";
 
 const scheduleBatchSchema = z.object({
@@ -129,7 +129,7 @@ const addCostEntrySchema = z.object({
 });
 
 @Controller("api/v1/production")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("production")
 export class ProductionExecutionController {
   constructor(
@@ -144,7 +144,7 @@ export class ProductionExecutionController {
   @Get("work-centers/:workCenterId/dispatch-queue")
   @RequiredOrgPermissions({ production: ["read"] })
   async getWorkCenterDispatchQueue(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("workCenterId") workCenterId: string,
     @Query() query: unknown,
   ) {
@@ -182,7 +182,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/schedule")
   @RequiredOrgPermissions({ production: ["schedule"] })
   async scheduleBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -209,7 +209,7 @@ export class ProductionExecutionController {
   @Get("batches/:batchId/operations")
   @RequiredOrgPermissions({ production: ["read"] })
   async listOperations(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
   ) {
     return this.executionService.listOperations(tenant, batchId);
@@ -218,7 +218,7 @@ export class ProductionExecutionController {
   @Get("batches/:batchId/operations/:operationId")
   @RequiredOrgPermissions({ production: ["read"] })
   async getOperation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
   ) {
@@ -228,7 +228,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/operations/:operationId/start")
   @RequiredOrgPermissions({ production: ["update"] })
   async startOperation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
     @Body() body: unknown,
@@ -253,7 +253,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/operations/:operationId/pause")
   @RequiredOrgPermissions({ production: ["update"] })
   async pauseOperation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
     @Req() req: FastifyRequest,
@@ -269,7 +269,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/operations/:operationId/time-logs")
   @RequiredOrgPermissions({ production: ["update"] })
   async logTime(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
     @Body() body: unknown,
@@ -294,7 +294,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/operations/:operationId/complete")
   @RequiredOrgPermissions({ production: ["update"] })
   async completeOperation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
     @Body() body: unknown,
@@ -319,7 +319,7 @@ export class ProductionExecutionController {
   @Get("batches/:batchId/operations/:operationId/files")
   @RequiredOrgPermissions({ production: ["read"] })
   async listOperationFiles(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
   ) {
@@ -333,7 +333,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/operations/:operationId/files")
   @RequiredOrgPermissions({ production: ["update"] })
   async addOperationFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
     @Req() req: FastifyRequest,
@@ -351,7 +351,7 @@ export class ProductionExecutionController {
   @Delete("batches/:batchId/operations/:operationId/files/:attachmentId")
   @RequiredOrgPermissions({ production: ["update"] })
   async removeOperationFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("operationId") operationId: string,
     @Param("attachmentId") attachmentId: string,
@@ -373,7 +373,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/qc-checkpoints")
   @RequiredOrgPermissions({ production: ["qc"] })
   async createQcCheckpoint(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -396,7 +396,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/qc-checkpoints/:checkpointId/inspect")
   @RequiredOrgPermissions({ production: ["qc"] })
   async inspectQcCheckpoint(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("checkpointId") checkpointId: string,
     @Body() body: unknown,
@@ -421,7 +421,7 @@ export class ProductionExecutionController {
   @Get("batches/:batchId/qc-checkpoints/:checkpointId/files")
   @RequiredOrgPermissions({ production: ["read"] })
   async listQcCheckpointFiles(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("checkpointId") checkpointId: string,
   ) {
@@ -435,7 +435,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/qc-checkpoints/:checkpointId/files")
   @RequiredOrgPermissions({ production: ["qc"] })
   async addQcCheckpointFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("checkpointId") checkpointId: string,
     @Req() req: FastifyRequest,
@@ -453,7 +453,7 @@ export class ProductionExecutionController {
   @Delete("batches/:batchId/qc-checkpoints/:checkpointId/files/:attachmentId")
   @RequiredOrgPermissions({ production: ["qc"] })
   async removeQcCheckpointFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Param("checkpointId") checkpointId: string,
     @Param("attachmentId") attachmentId: string,
@@ -471,7 +471,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/qc-release")
   @RequiredOrgPermissions({ production: ["qc"] })
   async qcReleaseBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -498,7 +498,7 @@ export class ProductionExecutionController {
   @Get("batches/:batchId/costing")
   @RequiredOrgPermissions({ production: ["read"] })
   async getBatchCosting(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
   ) {
     return this.executionService.getBatchCosting(tenant, batchId);
@@ -507,7 +507,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/cost-entries")
   @RequiredOrgPermissions({ production: ["costing"] })
   async addCostEntry(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -530,7 +530,7 @@ export class ProductionExecutionController {
   @Post("batches/:batchId/close")
   @RequiredOrgPermissions({ production: ["costing"] })
   async closeBatch(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -540,7 +540,7 @@ export class ProductionExecutionController {
   @Get("batches/:batchId/batch-record")
   @RequiredOrgPermissions({ production: ["read"] })
   async getElectronicBatchRecord(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("batchId") batchId: string,
   ) {
     return this.executionService.getElectronicBatchRecord(tenant, batchId);

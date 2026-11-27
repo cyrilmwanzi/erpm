@@ -12,11 +12,11 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { OAuthClientsService } from "./oauth-clients.service.js";
 import { ORGANIZATION_ROLE_NAMES } from "./permissions.js";
 
@@ -120,7 +120,7 @@ const revokeDeviceSchema = z.object({
 });
 
 @Controller("api/v1/auth")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class OAuthClientsController {
   constructor(
     @Inject(OAuthClientsService)
@@ -130,7 +130,7 @@ export class OAuthClientsController {
   @Post("oauth-clients")
   @RequiredOrgPermissions({ oauthClient: ["create"] })
   async createClient(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = createOAuthClientSchema.safeParse(body);
@@ -146,7 +146,7 @@ export class OAuthClientsController {
   @Get("oauth-clients")
   @RequiredOrgPermissions({ oauthClient: ["read"] })
   async listClients(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listClientsQuerySchema.safeParse(query ?? {});
@@ -162,7 +162,7 @@ export class OAuthClientsController {
   @Get("oauth-clients/:idOrClientId")
   @RequiredOrgPermissions({ oauthClient: ["read"] })
   async getClient(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("idOrClientId") idOrClientId: string,
   ) {
     return this.oauthClientsService.findClientForTenant(tenant, idOrClientId);
@@ -171,7 +171,7 @@ export class OAuthClientsController {
   @Patch("oauth-clients/:idOrClientId")
   @RequiredOrgPermissions({ oauthClient: ["update"] })
   async updateClient(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("idOrClientId") idOrClientId: string,
     @Body() body: unknown,
   ) {
@@ -188,7 +188,7 @@ export class OAuthClientsController {
   @Post("oauth-clients/:idOrClientId/rotate-secret")
   @RequiredOrgPermissions({ oauthClient: ["update"] })
   async rotateSecret(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("idOrClientId") idOrClientId: string,
   ) {
     return this.oauthClientsService.rotateClientSecret(tenant, idOrClientId);
@@ -197,7 +197,7 @@ export class OAuthClientsController {
   @Post("oauth-clients/:idOrClientId/keys")
   @RequiredOrgPermissions({ oauthClient: ["manageKeys"] })
   async addPublicKey(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("idOrClientId") idOrClientId: string,
     @Body() body: unknown,
   ) {
@@ -218,7 +218,7 @@ export class OAuthClientsController {
   @Get("oauth-clients/:idOrClientId/keys")
   @RequiredOrgPermissions({ oauthClient: ["read"] })
   async listPublicKeys(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("idOrClientId") idOrClientId: string,
   ) {
     return this.oauthClientsService.listClientPublicKeys(tenant, idOrClientId);
@@ -227,7 +227,7 @@ export class OAuthClientsController {
   @Delete("oauth-clients/:idOrClientId/keys/:keyId")
   @RequiredOrgPermissions({ oauthClient: ["manageKeys"] })
   async revokePublicKey(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("idOrClientId") idOrClientId: string,
     @Param("keyId") keyId: string,
   ) {
@@ -241,7 +241,7 @@ export class OAuthClientsController {
   @Get("devices")
   @RequiredOrgPermissions({ device: ["read"] })
   async listDevices(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listDevicesQuerySchema.safeParse(query ?? {});
@@ -257,7 +257,7 @@ export class OAuthClientsController {
   @Patch("devices/:deviceId")
   @RequiredOrgPermissions({ device: ["update"] })
   async updateDevice(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deviceId") deviceId: string,
     @Body() body: unknown,
   ) {
@@ -274,7 +274,7 @@ export class OAuthClientsController {
   @Post("devices/:deviceId/revoke")
   @RequiredOrgPermissions({ device: ["revoke"] })
   async revokeDevicePost(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deviceId") deviceId: string,
     @Body() body: unknown,
   ) {
@@ -295,7 +295,7 @@ export class OAuthClientsController {
   @Delete("devices/:deviceId")
   @RequiredOrgPermissions({ device: ["revoke"] })
   async revokeDeviceDelete(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deviceId") deviceId: string,
   ) {
     return this.oauthClientsService.revokeDevice(tenant, deviceId);

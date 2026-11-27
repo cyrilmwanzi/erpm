@@ -19,12 +19,12 @@ import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { CrmBridgeService } from "./crm-bridge.service.js";
 import { CrmConnectionService } from "./crm-connection.service.js";
 import { CrmProxyService } from "./crm-proxy.service.js";
@@ -199,17 +199,17 @@ export class CrmController {
   // ==========================================
 
   @Get("connection")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["configure"] })
-  async getConnection(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getConnection(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.connectionService.getConnectionStatus(tenant);
   }
 
   @Put("connection")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["configure"] })
   async upsertConnection(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -224,20 +224,20 @@ export class CrmController {
   }
 
   @Post("connection/test")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["configure"] })
   async testConnection(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.connectionService.testConnection(tenant, req.ip);
   }
 
   @Delete("connection")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["configure"] })
   async deleteConnection(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.connectionService.deleteConnection(tenant, req.ip);
@@ -248,17 +248,17 @@ export class CrmController {
   // ==========================================
 
   @Get("staff-mappings")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
-  async listStaffMappings(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async listStaffMappings(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.bridgeService.listStaffMappings(tenant);
   }
 
   @Post("staff-mappings")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["configure"] })
   async upsertStaffMapping(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -273,10 +273,10 @@ export class CrmController {
   }
 
   @Delete("staff-mappings/:staffId")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["configure"] })
   async deleteStaffMapping(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("staffId") staffId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -284,10 +284,10 @@ export class CrmController {
   }
 
   @Post("catalog/push")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["create"] })
   async pushCatalog(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -310,10 +310,10 @@ export class CrmController {
   // ==========================================
 
   @Get("contacts")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listContacts(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listCrmQuerySchema.safeParse(query ?? {});
@@ -327,20 +327,20 @@ export class CrmController {
   }
 
   @Get("contacts/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async getContact(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
   ) {
     return this.proxyService.getResource(tenant, "contacts", id);
   }
 
   @Post("contacts")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["create"] })
   async createContact(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -360,10 +360,10 @@ export class CrmController {
   }
 
   @Patch("contacts/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["update"] })
   async updateContact(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -385,10 +385,10 @@ export class CrmController {
   }
 
   @Delete("contacts/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["delete"] })
   async deleteContact(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Req() req: FastifyRequest,
   ) {
@@ -400,10 +400,10 @@ export class CrmController {
   // ==========================================
 
   @Get("companies")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listCompanies(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listCrmQuerySchema.safeParse(query ?? {});
@@ -417,20 +417,20 @@ export class CrmController {
   }
 
   @Get("companies/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async getCompany(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
   ) {
     return this.proxyService.getResource(tenant, "organizations", id);
   }
 
   @Post("companies")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["create"] })
   async createCompany(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -450,10 +450,10 @@ export class CrmController {
   }
 
   @Patch("companies/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["update"] })
   async updateCompany(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -475,10 +475,10 @@ export class CrmController {
   }
 
   @Delete("companies/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["delete"] })
   async deleteCompany(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Req() req: FastifyRequest,
   ) {
@@ -495,10 +495,10 @@ export class CrmController {
   // ==========================================
 
   @Get("deals")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listDeals(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listCrmQuerySchema.safeParse(query ?? {});
@@ -512,20 +512,20 @@ export class CrmController {
   }
 
   @Get("deals/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async getDeal(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
   ) {
     return this.proxyService.getDealWithContext(tenant, id);
   }
 
   @Post("deals")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["create"] })
   async createDeal(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -540,10 +540,10 @@ export class CrmController {
   }
 
   @Patch("deals/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["update"] })
   async updateDeal(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -565,10 +565,10 @@ export class CrmController {
   }
 
   @Delete("deals/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["delete"] })
   async deleteDeal(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Req() req: FastifyRequest,
   ) {
@@ -576,20 +576,20 @@ export class CrmController {
   }
 
   @Get("deals/:dealId/items")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listDealItems(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("dealId") dealId: string,
   ) {
     return this.bridgeService.listDealItems(tenant, dealId);
   }
 
   @Post("deals/:dealId/items")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["update"] })
   async linkDealItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("dealId") dealId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -610,10 +610,10 @@ export class CrmController {
   }
 
   @Delete("deals/:dealId/items/:itemId")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["update"] })
   async unlinkDealItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("dealId") dealId: string,
     @Param("itemId") itemId: string,
     @Req() req: FastifyRequest,
@@ -631,10 +631,10 @@ export class CrmController {
   // ==========================================
 
   @Get("services")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listServices(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listCrmQuerySchema.safeParse(query ?? {});
@@ -648,10 +648,10 @@ export class CrmController {
   }
 
   @Post("services")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["create"] })
   async createService(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -671,10 +671,10 @@ export class CrmController {
   }
 
   @Get("tasks")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listTasks(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listCrmQuerySchema.safeParse(query ?? {});
@@ -688,10 +688,10 @@ export class CrmController {
   }
 
   @Post("tasks")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["create"] })
   async createTask(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -706,10 +706,10 @@ export class CrmController {
   }
 
   @Patch("tasks/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["update"] })
   async updateTask(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -731,10 +731,10 @@ export class CrmController {
   }
 
   @Delete("tasks/:id")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["delete"] })
   async deleteTask(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("id") id: string,
     @Req() req: FastifyRequest,
   ) {
@@ -746,10 +746,10 @@ export class CrmController {
   // ==========================================
 
   @Get("webhooks/events")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ crm: ["read"] })
   async listWebhookEvents(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listWebhookQuerySchema.safeParse(query ?? {});

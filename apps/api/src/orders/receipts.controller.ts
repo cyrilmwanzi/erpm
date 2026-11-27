@@ -11,11 +11,11 @@ import { CustomerPaymentStatus } from "@scace/db";
 import type { FastifyReply } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import {
   renderReceiptHtml,
   renderReceiptPdf,
@@ -47,7 +47,7 @@ function sanitizeFilenameSegment(value: string): string {
 }
 
 @Controller("api/v1")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class ReceiptsController {
   constructor(
     @Inject(InvoicesPaymentsService)
@@ -57,7 +57,7 @@ export class ReceiptsController {
   @Get("payments")
   @RequiredOrgPermissions({ payment: ["read"] })
   async listPayments(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listPaymentsQuerySchema.safeParse(query ?? {});
@@ -74,7 +74,7 @@ export class ReceiptsController {
   @Get("payments/:paymentId")
   @RequiredOrgPermissions({ payment: ["read"] })
   async getPayment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("paymentId") paymentId: string,
   ) {
     return this.invoicesPaymentsService.getPayment(tenant, paymentId);
@@ -83,7 +83,7 @@ export class ReceiptsController {
   @Get("receipts")
   @RequiredOrgPermissions({ receipt: ["read"] })
   async listReceipts(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listReceiptsQuerySchema.safeParse(query ?? {});
@@ -100,7 +100,7 @@ export class ReceiptsController {
   @Get("receipts/:receiptId")
   @RequiredOrgPermissions({ receipt: ["read"] })
   async getReceipt(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("receiptId") receiptId: string,
   ) {
     return this.invoicesPaymentsService.getReceipt(tenant, receiptId);
@@ -109,7 +109,7 @@ export class ReceiptsController {
   @Get("receipts/:receiptId/html")
   @RequiredOrgPermissions({ receipt: ["read"] })
   async getReceiptHtml(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("receiptId") receiptId: string,
     @Res() reply: FastifyReply,
   ) {
@@ -131,7 +131,7 @@ export class ReceiptsController {
   @Get("receipts/:receiptId/pdf")
   @RequiredOrgPermissions({ receipt: ["read"] })
   async getReceiptPdf(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("receiptId") receiptId: string,
     @Res() reply: FastifyReply,
   ) {

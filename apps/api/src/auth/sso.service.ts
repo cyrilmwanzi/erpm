@@ -11,7 +11,7 @@ import { type Prisma } from "@scace/db";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { auth } from "./auth.config.js";
 import {
   decodeJwt,
@@ -209,7 +209,7 @@ export class SsoService {
     };
   }
 
-  async listTenantProviders(tenant: AuthenticatedTenant) {
+  async listOrganizationProviders(tenant: AuthenticatedOrganization) {
     const items = await this.prismaService.scoped.organizationSsoProvider.findMany({
       where: { organizationId: tenant.organizationId },
       select: {
@@ -244,7 +244,7 @@ export class SsoService {
     };
   }
 
-  async createTenantProvider(tenant: AuthenticatedTenant, input: UpsertSsoProviderInput) {
+  async createOrganizationProvider(tenant: AuthenticatedOrganization, input: UpsertSsoProviderInput) {
     const normalizedKey = input.providerKey.trim().toLowerCase();
     if (!/^[a-z0-9-]+$/.test(normalizedKey)) {
       throw new BadRequestException(
@@ -357,8 +357,8 @@ export class SsoService {
     };
   }
 
-  async updateTenantProvider(
-    tenant: AuthenticatedTenant,
+  async updateOrganizationProvider(
+    tenant: AuthenticatedOrganization,
     idOrKey: string,
     input: Partial<UpsertSsoProviderInput>,
   ) {
@@ -462,7 +462,7 @@ export class SsoService {
     return updated;
   }
 
-  async deleteTenantProvider(tenant: AuthenticatedTenant, idOrKey: string) {
+  async deleteOrganizationProvider(tenant: AuthenticatedOrganization, idOrKey: string) {
     const existing = await this.prismaService.scoped.organizationSsoProvider.findFirst({
       where: {
         organizationId: tenant.organizationId,

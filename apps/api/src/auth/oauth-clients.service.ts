@@ -10,7 +10,7 @@ import { type Prisma } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   generateRandomToken,
   parseClientPublicKey,
@@ -180,7 +180,7 @@ export class OAuthClientsService {
     return scopes;
   }
 
-  async createClient(tenant: AuthenticatedTenant, input: CreateOAuthClientInput) {
+  async createClient(tenant: AuthenticatedOrganization, input: CreateOAuthClientInput) {
     const scopes = this.validateScopes(input.allowedScopes);
     const serviceRole = input.serviceRole ?? "member";
     if (!isValidOrganizationRole(serviceRole)) {
@@ -326,7 +326,7 @@ export class OAuthClientsService {
   }
 
   async listClients(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     filters?: { appCategory?: OAuthAppCategoryValue; status?: "ACTIVE" | "SUSPENDED" | "REVOKED" },
   ) {
     const items = await this.prismaService.scoped.oAuthClient.findMany({
@@ -371,7 +371,7 @@ export class OAuthClientsService {
     return { items };
   }
 
-  async findClientForTenant(tenant: AuthenticatedTenant, idOrClientId: string) {
+  async findClientForTenant(tenant: AuthenticatedOrganization, idOrClientId: string) {
     const client = await this.prismaService.scoped.oAuthClient.findFirst({
       where: {
         organizationId: tenant.organizationId,
@@ -402,7 +402,7 @@ export class OAuthClientsService {
   }
 
   async updateClient(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     idOrClientId: string,
     input: UpdateOAuthClientInput,
   ) {
@@ -519,7 +519,7 @@ export class OAuthClientsService {
     return updated;
   }
 
-  async rotateClientSecret(tenant: AuthenticatedTenant, idOrClientId: string) {
+  async rotateClientSecret(tenant: AuthenticatedOrganization, idOrClientId: string) {
     const existing = await this.prismaService.scoped.oAuthClient.findFirst({
       where: {
         organizationId: tenant.organizationId,
@@ -565,7 +565,7 @@ export class OAuthClientsService {
   }
 
   async addClientPublicKey(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     idOrClientId: string,
     input: AddClientPublicKeyInput,
   ) {
@@ -644,7 +644,7 @@ export class OAuthClientsService {
     return created;
   }
 
-  async listClientPublicKeys(tenant: AuthenticatedTenant, idOrClientId: string) {
+  async listClientPublicKeys(tenant: AuthenticatedOrganization, idOrClientId: string) {
     const client = await this.prismaService.scoped.oAuthClient.findFirst({
       where: {
         organizationId: tenant.organizationId,
@@ -679,7 +679,7 @@ export class OAuthClientsService {
   }
 
   async revokeClientPublicKey(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     idOrClientId: string,
     keyId: string,
   ) {
@@ -724,7 +724,7 @@ export class OAuthClientsService {
   }
 
   async listDevices(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     filters?: {
       deviceType?: "ANDROID" | "POS_TERMINAL" | "PRODUCTION_KIOSK" | "SCANNER" | "SYSTEM_AGENT";
       status?: "ACTIVE" | "SUSPENDED" | "REVOKED";
@@ -762,7 +762,7 @@ export class OAuthClientsService {
   }
 
   async updateDevice(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deviceId: string,
     input: {
       name?: string;
@@ -820,7 +820,7 @@ export class OAuthClientsService {
   }
 
   async revokeDevice(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deviceId: string,
     reason?: string,
   ) {

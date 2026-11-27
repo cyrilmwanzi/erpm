@@ -14,11 +14,11 @@ import { DepartmentStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { DepartmentsService } from "./departments.service.js";
 
 const departmentCodeSchema = z
@@ -53,7 +53,7 @@ const listDepartmentsQuerySchema = z.object({
 });
 
 @Controller("api/v1/departments")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class DepartmentsController {
   constructor(
     @Inject(DepartmentsService)
@@ -63,7 +63,7 @@ export class DepartmentsController {
   @Post()
   @RequiredOrgPermissions({ department: ["create"] })
   async createDepartment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -80,7 +80,7 @@ export class DepartmentsController {
   @Get()
   @RequiredOrgPermissions({ department: ["read"] })
   async listDepartments(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listDepartmentsQuerySchema.safeParse(query ?? {});
@@ -95,14 +95,14 @@ export class DepartmentsController {
 
   @Get("tree")
   @RequiredOrgPermissions({ department: ["read"] })
-  async getDepartmentTree(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getDepartmentTree(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.departmentsService.getDepartmentTree(tenant);
   }
 
   @Get(":departmentId")
   @RequiredOrgPermissions({ department: ["read"] })
   async getDepartment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("departmentId") departmentId: string,
   ) {
     return this.departmentsService.getDepartment(tenant, departmentId);
@@ -111,7 +111,7 @@ export class DepartmentsController {
   @Patch(":departmentId")
   @RequiredOrgPermissions({ department: ["update"] })
   async updateDepartment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("departmentId") departmentId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -134,7 +134,7 @@ export class DepartmentsController {
   @Post(":departmentId/archive")
   @RequiredOrgPermissions({ department: ["archive"] })
   async archiveDepartment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("departmentId") departmentId: string,
     @Req() req: FastifyRequest,
   ) {

@@ -15,14 +15,14 @@ import {
   CommunicationEventType,
   OutboxDeliveryStatus,
   Prisma,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { EmailService } from "../email/email.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   assertSafeResolvedWebhookHost,
   decryptCommunicationSecret,
@@ -675,7 +675,7 @@ export class CommunicationOutboxService
   // Outbox Query / Consumer Claim / Acknowledge APIs
   // ==========================================
 
-  async listOutboxEvents(tenant: AuthenticatedTenant, query: ListOutboxQuery) {
+  async listOutboxEvents(tenant: AuthenticatedOrganization, query: ListOutboxQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
 
@@ -711,7 +711,7 @@ export class CommunicationOutboxService
     };
   }
 
-  async getOutboxEvent(tenant: AuthenticatedTenant, eventId: string) {
+  async getOutboxEvent(tenant: AuthenticatedOrganization, eventId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const event =
       await this.prismaService.scoped.communicationOutboxEvent.findFirst({
@@ -729,7 +729,7 @@ export class CommunicationOutboxService
   }
 
   async claimOutboxEvents(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: ClaimOutboxInput,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -798,7 +798,7 @@ export class CommunicationOutboxService
   }
 
   async acknowledgeOutboxEvent(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     eventId: string,
     input: {
       status?: "DISPATCHED" | "ACKNOWLEDGED" | "FAILED" | "CANCELLED";
@@ -889,7 +889,7 @@ export class CommunicationOutboxService
   }
 
   async retryOutboxEvent(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     eventId: string,
     ipAddress?: string,
   ) {
@@ -939,7 +939,7 @@ export class CommunicationOutboxService
   // Alert Rules CRUD
   // ==========================================
 
-  async listAlertRules(tenant: AuthenticatedTenant) {
+  async listAlertRules(tenant: AuthenticatedOrganization) {
     this.resolveVerifiedOrganizationId(tenant);
     const items = await this.prismaService.scoped.alertRule.findMany({
       orderBy: [{ eventType: "asc" }, { createdAt: "desc" }],
@@ -951,7 +951,7 @@ export class CommunicationOutboxService
   }
 
   async createAlertRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateAlertRuleInput,
     ipAddress?: string,
   ) {
@@ -1011,7 +1011,7 @@ export class CommunicationOutboxService
   }
 
   async updateAlertRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ruleId: string,
     input: UpdateAlertRuleInput,
     ipAddress?: string,
@@ -1092,7 +1092,7 @@ export class CommunicationOutboxService
   }
 
   async deleteAlertRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ruleId: string,
     ipAddress?: string,
   ) {
@@ -1161,7 +1161,7 @@ export class CommunicationOutboxService
     };
   }
 
-  async listWebhooks(tenant: AuthenticatedTenant) {
+  async listWebhooks(tenant: AuthenticatedOrganization) {
     this.resolveVerifiedOrganizationId(tenant);
     const items = await this.prismaService.scoped.communicationWebhook.findMany({
       orderBy: { createdAt: "desc" },
@@ -1173,7 +1173,7 @@ export class CommunicationOutboxService
   }
 
   async createWebhook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateWebhookInput,
     ipAddress?: string,
   ) {
@@ -1230,7 +1230,7 @@ export class CommunicationOutboxService
   }
 
   async updateWebhook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     webhookId: string,
     input: UpdateWebhookInput,
     ipAddress?: string,
@@ -1291,7 +1291,7 @@ export class CommunicationOutboxService
   }
 
   async rotateWebhookSecret(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     webhookId: string,
     ipAddress?: string,
   ) {
@@ -1340,7 +1340,7 @@ export class CommunicationOutboxService
   }
 
   async deleteWebhook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     webhookId: string,
     ipAddress?: string,
   ) {
@@ -1372,7 +1372,7 @@ export class CommunicationOutboxService
   }
 
   async testWebhook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     webhookId: string,
     ipAddress?: string,
   ) {
@@ -1466,10 +1466,10 @@ export class CommunicationOutboxService
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

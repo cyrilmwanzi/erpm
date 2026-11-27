@@ -15,11 +15,11 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { MpesaPaymentService } from "../payments/mpesa-payment.service.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import {
   renderInvoiceHtml,
   renderInvoicePdf,
@@ -79,7 +79,7 @@ function sanitizeFilenameSegment(value: string): string {
 }
 
 @Controller("api/v1/invoices")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class InvoicesController {
   constructor(
     @Inject(InvoicesPaymentsService)
@@ -91,7 +91,7 @@ export class InvoicesController {
   @Get()
   @RequiredOrgPermissions({ invoice: ["read"] })
   async listInvoices(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listInvoicesQuerySchema.safeParse(query ?? {});
@@ -108,7 +108,7 @@ export class InvoicesController {
   @Get(":invoiceId")
   @RequiredOrgPermissions({ invoice: ["read"] })
   async getInvoice(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
   ) {
     return this.invoicesPaymentsService.getInvoice(tenant, invoiceId);
@@ -117,7 +117,7 @@ export class InvoicesController {
   @Get(":invoiceId/html")
   @RequiredOrgPermissions({ invoice: ["read"] })
   async getInvoiceHtml(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
     @Res() reply: FastifyReply,
   ) {
@@ -139,7 +139,7 @@ export class InvoicesController {
   @Get(":invoiceId/pdf")
   @RequiredOrgPermissions({ invoice: ["read"] })
   async getInvoicePdf(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
     @Res() reply: FastifyReply,
   ) {
@@ -162,7 +162,7 @@ export class InvoicesController {
   @Post(":invoiceId/issue")
   @RequiredOrgPermissions({ invoice: ["issue"] })
   async issueInvoice(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -186,7 +186,7 @@ export class InvoicesController {
   @Post(":invoiceId/payments")
   @RequiredOrgPermissions({ payment: ["record"] })
   async recordCashPayment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -210,7 +210,7 @@ export class InvoicesController {
   @Post(":invoiceId/payments/mpesa/stk-push")
   @RequiredOrgPermissions({ payment: ["record"] })
   async initiateInvoiceMpesaStkPush(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -234,7 +234,7 @@ export class InvoicesController {
   @Post(":invoiceId/void")
   @RequiredOrgPermissions({ invoice: ["void"] })
   async voidInvoice(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("invoiceId") invoiceId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

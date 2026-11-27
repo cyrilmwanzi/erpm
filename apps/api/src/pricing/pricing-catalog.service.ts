@@ -15,10 +15,10 @@ import {
   PricingModel,
   Prisma,
   ServicePlanType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface CreateItemPackInput {
   code: string;
@@ -178,10 +178,10 @@ export class PricingCatalogService {
     @Inject(PrismaService) private readonly prismaService: PrismaService,
   ) {}
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
@@ -269,7 +269,7 @@ export class PricingCatalogService {
     }
   }
 
-  async getItemPricingOptions(tenant: AuthenticatedTenant, itemId: string) {
+  async getItemPricingOptions(tenant: AuthenticatedOrganization, itemId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const item = await this.prismaService.scoped.item.findUnique({
@@ -420,7 +420,7 @@ export class PricingCatalogService {
   // ==========================================
 
   async createItemPack(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     input: CreateItemPackInput,
     ipAddress?: string,
@@ -505,7 +505,7 @@ export class PricingCatalogService {
   }
 
   async updateItemPack(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     packId: string,
     input: UpdateItemPackInput,
     ipAddress?: string,
@@ -591,7 +591,7 @@ export class PricingCatalogService {
   }
 
   async deleteItemPack(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     packId: string,
     ipAddress?: string,
   ) {
@@ -628,7 +628,7 @@ export class PricingCatalogService {
   // ==========================================
 
   async setBundleComponents(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     bundleItemId: string,
     components: BundleComponentInput[],
     ipAddress?: string,
@@ -768,7 +768,7 @@ export class PricingCatalogService {
     });
   }
 
-  async getBundleComponents(tenant: AuthenticatedTenant, bundleItemId: string) {
+  async getBundleComponents(tenant: AuthenticatedOrganization, bundleItemId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const item = await this.prismaService.scoped.item.findUnique({
       where: { id: bundleItemId },
@@ -817,7 +817,7 @@ export class PricingCatalogService {
   // ==========================================
 
   async createServicePlan(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     input: CreateServicePlanInput,
     ipAddress?: string,
@@ -889,7 +889,7 @@ export class PricingCatalogService {
   }
 
   async updateServicePlan(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     planId: string,
     input: UpdateServicePlanInput,
     ipAddress?: string,
@@ -953,7 +953,7 @@ export class PricingCatalogService {
   // ==========================================
 
   async createPriceBook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreatePriceBookInput,
     ipAddress?: string,
   ) {
@@ -1034,7 +1034,7 @@ export class PricingCatalogService {
   }
 
   async listPriceBooks(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: {
       direction?: PriceBookDirection;
       customerSegment?: string;
@@ -1062,7 +1062,7 @@ export class PricingCatalogService {
     return { organizationId, items };
   }
 
-  async getPriceBook(tenant: AuthenticatedTenant, priceBookId: string) {
+  async getPriceBook(tenant: AuthenticatedOrganization, priceBookId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const pb = await this.prismaService.scoped.priceBook.findUnique({
       where: { id: priceBookId },
@@ -1085,7 +1085,7 @@ export class PricingCatalogService {
   }
 
   async updatePriceBook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     priceBookId: string,
     input: UpdatePriceBookInput,
     ipAddress?: string,
@@ -1161,7 +1161,7 @@ export class PricingCatalogService {
   }
 
   async createPriceRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     priceBookId: string,
     input: CreatePriceRuleInput,
     ipAddress?: string,
@@ -1257,7 +1257,7 @@ export class PricingCatalogService {
   }
 
   async updatePriceRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ruleId: string,
     input: UpdatePriceRuleInput,
     ipAddress?: string,
@@ -1334,7 +1334,7 @@ export class PricingCatalogService {
   }
 
   async deletePriceRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     ruleId: string,
     ipAddress?: string,
   ) {
@@ -1366,7 +1366,7 @@ export class PricingCatalogService {
   // ==========================================
 
   async createDiscountRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateDiscountRuleInput,
     ipAddress?: string,
   ) {
@@ -1452,7 +1452,7 @@ export class PricingCatalogService {
   }
 
   async listDiscountRules(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: { isActive?: boolean; promoCode?: string; scope?: DiscountScope },
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -1470,7 +1470,7 @@ export class PricingCatalogService {
   }
 
   async updateDiscountRule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     discountId: string,
     input: UpdateDiscountRuleInput,
     ipAddress?: string,

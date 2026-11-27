@@ -10,7 +10,7 @@ import {
   NotificationDeliveryStatus,
   NotificationEventType,
   Prisma,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { CrmConnectionService } from "../crm/crm-connection.service.js";
 import {
@@ -19,7 +19,7 @@ import {
 } from "../crm/customermates.client.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { EmailService } from "../email/email.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface UpsertNotificationTemplateInput {
   eventType: NotificationEventType;
@@ -237,7 +237,7 @@ export class FulfillmentNotificationsService {
     @Inject(EmailService) private readonly emailService: EmailService,
   ) {}
 
-  async listTemplates(tenant: AuthenticatedTenant) {
+  async listTemplates(tenant: AuthenticatedOrganization) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const customRows = await this.prismaService.scoped.notificationTemplate.findMany({
       where: { organizationId },
@@ -278,7 +278,7 @@ export class FulfillmentNotificationsService {
   }
 
   async upsertTemplate(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: UpsertNotificationTemplateInput,
     ipAddress?: string,
   ) {
@@ -344,7 +344,7 @@ export class FulfillmentNotificationsService {
   }
 
   async resetTemplateToDefault(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     eventType: NotificationEventType,
     channel: CommunicationChannel,
     ipAddress?: string,
@@ -392,7 +392,7 @@ export class FulfillmentNotificationsService {
   }
 
   async listNotifications(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListNotificationsQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -435,7 +435,7 @@ export class FulfillmentNotificationsService {
   }
 
   async dispatchFulfillmentNotification(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: DispatchFulfillmentNotificationInput,
     ipAddress?: string,
   ) {
@@ -810,10 +810,10 @@ export class FulfillmentNotificationsService {
     }
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

@@ -18,7 +18,7 @@ import {
   PaymentTransactionStatus,
   Prisma,
   SalesInvoiceStatus,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import {
   generateRandomToken,
@@ -28,7 +28,7 @@ import {
 } from "../auth/crypto.utils.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { MpesaConfigService } from "./mpesa-config.service.js";
 import { MpesaDarajaClient } from "./mpesa-daraja.client.js";
 import {
@@ -148,7 +148,7 @@ export class MpesaPaymentService {
   ) {}
 
   async initiateStkPushForOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     orderId: string,
     input: InitiateOrderMpesaStkInput,
     ipAddress?: string,
@@ -202,7 +202,7 @@ export class MpesaPaymentService {
   }
 
   async initiateStkPushForInvoice(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     invoiceId: string,
     input: InitiateInvoiceMpesaStkInput,
     ipAddress?: string,
@@ -265,7 +265,7 @@ export class MpesaPaymentService {
   }
 
   async initiateStkPushForFulfillment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     input: InitiateFulfillmentMpesaStkInput,
     ipAddress?: string,
@@ -479,7 +479,7 @@ export class MpesaPaymentService {
   }
 
   async listTransactions(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListMpesaTransactionsQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -536,7 +536,7 @@ export class MpesaPaymentService {
     };
   }
 
-  async getTransaction(tenant: AuthenticatedTenant, transactionId: string) {
+  async getTransaction(tenant: AuthenticatedOrganization, transactionId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const txRecord = await this.prismaService.scoped.paymentTransaction.findUnique({
       where: { id: transactionId },
@@ -559,7 +559,7 @@ export class MpesaPaymentService {
   }
 
   async queryStkStatusAndReconcile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     transactionId: string,
     ipAddress?: string,
   ) {
@@ -658,7 +658,7 @@ export class MpesaPaymentService {
   }
 
   async reconcileUnmatchedC2b(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     transactionId: string,
     input: ReconcileUnmatchedC2bInput,
     ipAddress?: string,
@@ -1051,7 +1051,7 @@ export class MpesaPaymentService {
   // ==========================================
 
   async simulateStkCallback(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: SimulateStkCallbackInput,
     clientIp?: string,
   ) {
@@ -1144,7 +1144,7 @@ export class MpesaPaymentService {
   }
 
   async simulateC2bWebhook(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: SimulateC2bInput,
     clientIp?: string,
   ) {
@@ -1352,10 +1352,10 @@ export class MpesaPaymentService {
     return rest;
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

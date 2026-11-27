@@ -15,11 +15,11 @@ import { ItemStatus, ItemType, VariantOptionDisplayType } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { VariantsService } from "./variants.service.js";
 
 const codeSchema = z
@@ -317,7 +317,7 @@ const resolveVariantSchema = z.object({
 });
 
 @Controller("api/v1/variants")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class VariantsController {
   constructor(
     @Inject(VariantsService) private readonly variantsService: VariantsService,
@@ -330,7 +330,7 @@ export class VariantsController {
   @Post("options")
   @RequiredOrgPermissions({ item: ["create"] })
   async createOption(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -348,7 +348,7 @@ export class VariantsController {
   @Get("options")
   @RequiredOrgPermissions({ item: ["read"] })
   async listOptions(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listOptionsQuerySchema.safeParse(query ?? {});
@@ -365,7 +365,7 @@ export class VariantsController {
   @Get("options/:optionId")
   @RequiredOrgPermissions({ item: ["read"] })
   async getOption(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("optionId") optionId: string,
   ) {
     return this.variantsService.getOption(tenant, optionId);
@@ -374,7 +374,7 @@ export class VariantsController {
   @Patch("options/:optionId")
   @RequiredOrgPermissions({ item: ["update"] })
   async updateOption(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("optionId") optionId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -398,7 +398,7 @@ export class VariantsController {
   @Post("options/:optionId/values")
   @RequiredOrgPermissions({ item: ["update"] })
   async addOptionValues(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("optionId") optionId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -422,7 +422,7 @@ export class VariantsController {
   @Patch("options/:optionId/values/:valueId")
   @RequiredOrgPermissions({ item: ["update"] })
   async updateOptionValue(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("optionId") optionId: string,
     @Param("valueId") valueId: string,
     @Body() body: unknown,
@@ -452,7 +452,7 @@ export class VariantsController {
   @Post("templates")
   @RequiredOrgPermissions({ item: ["create"] })
   async createTemplate(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -470,7 +470,7 @@ export class VariantsController {
   @Post("templates/:itemId/promote")
   @RequiredOrgPermissions({ item: ["update"] })
   async promoteToTemplate(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -494,7 +494,7 @@ export class VariantsController {
   @Get("templates")
   @RequiredOrgPermissions({ item: ["read"] })
   async listTemplates(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listTemplatesQuerySchema.safeParse(query ?? {});
@@ -511,7 +511,7 @@ export class VariantsController {
   @Get("templates/:templateId")
   @RequiredOrgPermissions({ item: ["read"] })
   async getTemplate(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
   ) {
     return this.variantsService.getTemplate(tenant, templateId);
@@ -520,7 +520,7 @@ export class VariantsController {
   @Put("templates/:templateId/options")
   @RequiredOrgPermissions({ item: ["update"] })
   async configureTemplateOptions(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -544,7 +544,7 @@ export class VariantsController {
   @Post("templates/:templateId/matrix/preview")
   @RequiredOrgPermissions({ item: ["read"] })
   async previewMatrix(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
     @Body() body: unknown,
   ) {
@@ -562,7 +562,7 @@ export class VariantsController {
   @Post("templates/:templateId/matrix/generate")
   @RequiredOrgPermissions({ item: ["create"] })
   async generateMatrix(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -586,7 +586,7 @@ export class VariantsController {
   @Post("templates/:templateId/variants")
   @RequiredOrgPermissions({ item: ["create"] })
   async createVariant(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -610,7 +610,7 @@ export class VariantsController {
   @Post("templates/:templateId/variants/bulk-update")
   @RequiredOrgPermissions({ item: ["update"] })
   async bulkUpdateVariants(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -634,7 +634,7 @@ export class VariantsController {
   @Post("templates/:templateId/resolve")
   @RequiredOrgPermissions({ item: ["read"] })
   async resolveByAttributes(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("templateId") templateId: string,
     @Body() body: unknown,
   ) {
@@ -660,7 +660,7 @@ export class VariantsController {
   @Get(":variantId")
   @RequiredOrgPermissions({ item: ["read"] })
   async getVariant(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("variantId") variantId: string,
   ) {
     return this.variantsService.getVariant(tenant, variantId);
@@ -669,7 +669,7 @@ export class VariantsController {
   @Patch(":variantId")
   @RequiredOrgPermissions({ item: ["update"] })
   async updateVariant(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("variantId") variantId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

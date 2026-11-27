@@ -2,7 +2,7 @@ import { Controller, Get, Inject, Req, UnauthorizedException } from "@nestjs/com
 import { PlatformRole } from "@scace/db";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
+import type { OrganizationScopedRequest } from "../organizations/organization.decorators.js";
 
 @Controller("api/v1/me")
 export class MeController {
@@ -11,7 +11,7 @@ export class MeController {
   ) {}
 
   @Get()
-  async getProfile(@Req() req: TenantScopedRequest) {
+  async getProfile(@Req() req: OrganizationScopedRequest) {
     const userSession = req.session;
     if (!userSession?.user?.id) {
       throw new UnauthorizedException("Authentication required.");

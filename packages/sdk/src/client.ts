@@ -28,7 +28,7 @@ export type ScaceSdk = Omit<GeneratedSdkNamespaces, "auth"> & {
   setPat(token: string): void;
   /** Clear active auth credentials (`{ type: "none" }`). */
   clearAuth(): void;
-  /** Set or clear the default `X-Organization-Id` header for tenant-scoped requests. */
+  /** Set or clear the default `X-Organization-Id` header for organization-scoped requests. */
   setOrganizationId(organizationId: string | undefined): void;
 };
 

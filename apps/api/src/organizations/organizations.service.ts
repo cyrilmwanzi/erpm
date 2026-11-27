@@ -19,15 +19,15 @@ import {
   parseRoleNames,
   type OrganizationRoleName,
 } from "../auth/permissions.js";
+import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
-import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { deriveOrganizationBucketName } from "../storage/storage.utils.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "./organization.decorators.js";
 
-export interface UpdateTenantSettingsInput {
+export interface UpdateOrganizationSettingsInput {
   companyLegalName?: string | null;
   defaultCurrency?: string;
   timezone?: string;
@@ -42,7 +42,7 @@ export interface CreateInvitationInput {
 }
 
 @Injectable()
-export class TenantsService {
+export class OrganizationsService {
   constructor(
     @Inject(PrismaService) private readonly prismaService: PrismaService,
     @Inject(RedisService) private readonly redisService: RedisService,
@@ -53,9 +53,9 @@ export class TenantsService {
     private readonly billingEnforcement?: BillingEnforcementService,
   ) {}
 
-  async getCurrentTenantOverview(tenant: AuthenticatedTenant) {
+  async getCurrentOrganizationOverview(organizationCtx: AuthenticatedOrganization) {
     const organization = await this.prismaService.raw.organization.findUnique({
-      where: { id: tenant.organizationId },
+      where: { id: organizationCtx.organizationId },
       select: {
         id: true,
         name: true,
@@ -70,51 +70,51 @@ export class TenantsService {
       throw new NotFoundException("Active organization was not found.");
     }
 
-    const settings = await this.getOrCreateSettings(tenant.organizationId);
-    const basePermissions = getResolvedPermissionsForRole(tenant.role);
-    const effectivePermissions = tenant.grantedScopes
-      ? intersectPermissionsWithScopes(basePermissions, tenant.grantedScopes)
+    const settings = await this.getOrCreateSettings(organizationCtx.organizationId);
+    const basePermissions = getResolvedPermissionsForRole(organizationCtx.role);
+    const effectivePermissions = organizationCtx.grantedScopes
+      ? intersectPermissionsWithScopes(basePermissions, organizationCtx.grantedScopes)
       : basePermissions;
 
     return {
       organization,
       membership: {
-        memberId: tenant.memberId,
-        role: tenant.role,
-        userId: tenant.userId,
-        authMethod: tenant.authMethod ?? "COOKIE_SESSION",
-        grantedScopes: tenant.grantedScopes ?? null,
-        deviceId: tenant.deviceId ?? null,
-        clientId: tenant.clientId ?? null,
-        isServicePrincipal: tenant.isServicePrincipal ?? false,
+        memberId: organizationCtx.memberId,
+        role: organizationCtx.role,
+        userId: organizationCtx.userId,
+        authMethod: organizationCtx.authMethod ?? "COOKIE_SESSION",
+        grantedScopes: organizationCtx.grantedScopes ?? null,
+        deviceId: organizationCtx.deviceId ?? null,
+        clientId: organizationCtx.clientId ?? null,
+        isServicePrincipal: organizationCtx.isServicePrincipal ?? false,
         permissions: effectivePermissions,
       },
       settings,
     };
   }
 
-  getEffectivePermissions(tenant: AuthenticatedTenant) {
-    const basePermissions = getResolvedPermissionsForRole(tenant.role);
-    const effectivePermissions = tenant.grantedScopes
-      ? intersectPermissionsWithScopes(basePermissions, tenant.grantedScopes)
+  getEffectivePermissions(organizationCtx: AuthenticatedOrganization) {
+    const basePermissions = getResolvedPermissionsForRole(organizationCtx.role);
+    const effectivePermissions = organizationCtx.grantedScopes
+      ? intersectPermissionsWithScopes(basePermissions, organizationCtx.grantedScopes)
       : basePermissions;
 
     return {
-      organizationId: tenant.organizationId,
-      memberId: tenant.memberId,
-      role: tenant.role,
-      authMethod: tenant.authMethod ?? "COOKIE_SESSION",
-      grantedScopes: tenant.grantedScopes ?? null,
-      deviceId: tenant.deviceId ?? null,
-      clientId: tenant.clientId ?? null,
-      isServicePrincipal: tenant.isServicePrincipal ?? false,
+      organizationId: organizationCtx.organizationId,
+      memberId: organizationCtx.memberId,
+      role: organizationCtx.role,
+      authMethod: organizationCtx.authMethod ?? "COOKIE_SESSION",
+      grantedScopes: organizationCtx.grantedScopes ?? null,
+      deviceId: organizationCtx.deviceId ?? null,
+      clientId: organizationCtx.clientId ?? null,
+      isServicePrincipal: organizationCtx.isServicePrincipal ?? false,
       availableRoles: ORGANIZATION_ROLE_NAMES,
       permissions: effectivePermissions,
     };
   }
 
   async getOrCreateSettings(organizationId: string) {
-    const cacheKey = `tenant:${organizationId}:settings`;
+    const cacheKey = `org:${organizationId}:settings`;
 
     try {
       const cached = await this.redisService.getJson<Record<string, unknown>>(cacheKey);
@@ -126,10 +126,10 @@ export class TenantsService {
     }
 
     const env = getEnv();
-    let settings = await this.prismaService.scoped.tenantSettings.findFirst({});
+    let settings = await this.prismaService.scoped.organizationSettings.findFirst({});
 
     if (!settings) {
-      settings = await this.prismaService.scoped.tenantSettings.create({
+      settings = await this.prismaService.scoped.organizationSettings.create({
         data: {
           organizationId,
           defaultCurrency: "USD",
@@ -156,15 +156,15 @@ export class TenantsService {
   }
 
   async updateSettings(
-    tenant: AuthenticatedTenant,
-    input: UpdateTenantSettingsInput,
+    organizationCtx: AuthenticatedOrganization,
+    input: UpdateOrganizationSettingsInput,
     ipAddress?: string,
   ) {
     const env = getEnv();
-    const existing = await this.prismaService.scoped.tenantSettings.findFirst({});
+    const existing = await this.prismaService.scoped.organizationSettings.findFirst({});
 
     const updated = existing
-      ? await this.prismaService.scoped.tenantSettings.update({
+      ? await this.prismaService.scoped.organizationSettings.update({
           where: { id: existing.id },
           data: {
             ...(input.companyLegalName !== undefined
@@ -182,15 +182,15 @@ export class TenantsService {
               : {}),
           },
         })
-      : await this.prismaService.scoped.tenantSettings.create({
+      : await this.prismaService.scoped.organizationSettings.create({
           data: {
-            organizationId: tenant.organizationId,
+            organizationId: organizationCtx.organizationId,
             companyLegalName: input.companyLegalName ?? null,
             defaultCurrency: input.defaultCurrency ?? "USD",
             timezone: input.timezone ?? "UTC",
             fiscalYearStartMonth: input.fiscalYearStartMonth ?? 1,
             storageBucket: deriveOrganizationBucketName(
-              tenant.organizationId,
+              organizationCtx.organizationId,
               env.RUSTFS_BUCKET_PREFIX,
             ),
             storageQuotaBytes: BigInt(env.STORAGE_DEFAULT_QUOTA_BYTES),
@@ -202,10 +202,10 @@ export class TenantsService {
 
     await this.prismaService.scoped.auditLog.create({
       data: {
-        organizationId: tenant.organizationId,
-        actorUserId: tenant.userId,
-        action: "tenant.settings.updated",
-        resourceType: "TenantSettings",
+        organizationId: organizationCtx.organizationId,
+        actorUserId: organizationCtx.userId,
+        action: "organization.settings.updated",
+        resourceType: "OrganizationSettings",
         resourceId: updated.id,
         metadata: input as Prisma.InputJsonValue,
         ipAddress: ipAddress ?? null,
@@ -213,8 +213,8 @@ export class TenantsService {
     });
 
     try {
-      await this.redisService.invalidateTenantCache(
-        tenant.organizationId,
+      await this.redisService.invalidateOrganizationCache(
+        organizationCtx.organizationId,
         "settings",
       );
     } catch {
@@ -223,8 +223,8 @@ export class TenantsService {
 
     const serialized = this.serializeSettings(updated);
     this.analyticsService.identifyOrganization({
-      organizationId: tenant.organizationId,
-      distinctId: tenant.userId,
+      organizationId: organizationCtx.organizationId,
+      distinctId: organizationCtx.userId,
       force: true,
       properties: {
         default_currency: serialized.defaultCurrency,
@@ -233,9 +233,9 @@ export class TenantsService {
       },
     });
     this.analyticsService.captureDomainEvent({
-      event: "tenant.settings_updated",
-      distinctId: tenant.userId,
-      organizationId: tenant.organizationId,
+      event: "organization.settings_updated",
+      distinctId: organizationCtx.userId,
+      organizationId: organizationCtx.organizationId,
       properties: {
         default_currency: serialized.defaultCurrency,
         timezone: serialized.timezone,
@@ -256,9 +256,9 @@ export class TenantsService {
     };
   }
 
-  async listMembers(tenant: AuthenticatedTenant) {
+  async listMembers(organizationCtx: AuthenticatedOrganization) {
     const members = await this.prismaService.raw.member.findMany({
-      where: { organizationId: tenant.organizationId },
+      where: { organizationId: organizationCtx.organizationId },
       select: {
         id: true,
         role: true,
@@ -277,7 +277,7 @@ export class TenantsService {
     });
 
     return {
-      organizationId: tenant.organizationId,
+      organizationId: organizationCtx.organizationId,
       items: members.map((item) => ({
         id: item.id,
         role: item.role,
@@ -289,7 +289,7 @@ export class TenantsService {
   }
 
   async updateMemberRole(
-    tenant: AuthenticatedTenant,
+    organizationCtx: AuthenticatedOrganization,
     memberId: string,
     nextRole: OrganizationRoleName,
     rawHeaders: IncomingHttpHeaders,
@@ -297,7 +297,7 @@ export class TenantsService {
     const targetMember = await this.prismaService.raw.member.findFirst({
       where: {
         id: memberId,
-        organizationId: tenant.organizationId,
+        organizationId: organizationCtx.organizationId,
       },
       select: {
         id: true,
@@ -310,7 +310,7 @@ export class TenantsService {
       throw new NotFoundException("Organization member not found.");
     }
 
-    const actorIsOwner = parseRoleNames(tenant.role).includes("owner");
+    const actorIsOwner = parseRoleNames(organizationCtx.role).includes("owner");
     const targetIsOwner = parseRoleNames(targetMember.role).includes("owner");
 
     if ((targetIsOwner || nextRole === "owner") && !actorIsOwner) {
@@ -320,7 +320,10 @@ export class TenantsService {
     }
 
     if (targetIsOwner && nextRole !== "owner") {
-      await this.ensureAnotherOwnerExists(tenant.organizationId, targetMember.id);
+      await this.ensureAnotherOwnerExists(
+        organizationCtx.organizationId,
+        targetMember.id,
+      );
     }
 
     try {
@@ -329,12 +332,12 @@ export class TenantsService {
         body: {
           memberId,
           role: nextRole,
-          organizationId: tenant.organizationId,
+          organizationId: organizationCtx.organizationId,
         },
       });
 
       await this.invalidateMemberCacheSafe(
-        tenant.organizationId,
+        organizationCtx.organizationId,
         targetMember.userId,
       );
 
@@ -345,14 +348,14 @@ export class TenantsService {
   }
 
   async removeMember(
-    tenant: AuthenticatedTenant,
+    organizationCtx: AuthenticatedOrganization,
     memberId: string,
     rawHeaders: IncomingHttpHeaders,
   ) {
     const targetMember = await this.prismaService.raw.member.findFirst({
       where: {
         id: memberId,
-        organizationId: tenant.organizationId,
+        organizationId: organizationCtx.organizationId,
       },
       select: {
         id: true,
@@ -365,7 +368,7 @@ export class TenantsService {
       throw new NotFoundException("Organization member not found.");
     }
 
-    const actorIsOwner = parseRoleNames(tenant.role).includes("owner");
+    const actorIsOwner = parseRoleNames(organizationCtx.role).includes("owner");
     const targetIsOwner = parseRoleNames(targetMember.role).includes("owner");
 
     if (targetIsOwner && !actorIsOwner) {
@@ -375,7 +378,10 @@ export class TenantsService {
     }
 
     if (targetIsOwner) {
-      await this.ensureAnotherOwnerExists(tenant.organizationId, targetMember.id);
+      await this.ensureAnotherOwnerExists(
+        organizationCtx.organizationId,
+        targetMember.id,
+      );
     }
 
     try {
@@ -383,12 +389,12 @@ export class TenantsService {
         headers: fromNodeHeaders(rawHeaders),
         body: {
           memberIdOrEmail: memberId,
-          organizationId: tenant.organizationId,
+          organizationId: organizationCtx.organizationId,
         },
       });
 
       await this.invalidateMemberCacheSafe(
-        tenant.organizationId,
+        organizationCtx.organizationId,
         targetMember.userId,
       );
 
@@ -398,10 +404,13 @@ export class TenantsService {
     }
   }
 
-  async listInvitations(tenant: AuthenticatedTenant, status?: string) {
+  async listInvitations(
+    organizationCtx: AuthenticatedOrganization,
+    status?: string,
+  ) {
     const invitations = await this.prismaService.raw.invitation.findMany({
       where: {
-        organizationId: tenant.organizationId,
+        organizationId: organizationCtx.organizationId,
         ...(status ? { status } : {}),
       },
       select: {
@@ -423,7 +432,7 @@ export class TenantsService {
     });
 
     return {
-      organizationId: tenant.organizationId,
+      organizationId: organizationCtx.organizationId,
       items: invitations.map((inv) => ({
         id: inv.id,
         email: inv.email,
@@ -437,11 +446,11 @@ export class TenantsService {
   }
 
   async createInvitation(
-    tenant: AuthenticatedTenant,
+    organizationCtx: AuthenticatedOrganization,
     input: CreateInvitationInput,
     rawHeaders: IncomingHttpHeaders,
   ) {
-    const actorIsOwner = parseRoleNames(tenant.role).includes("owner");
+    const actorIsOwner = parseRoleNames(organizationCtx.role).includes("owner");
     if (input.role === "owner" && !actorIsOwner) {
       throw new ForbiddenException(
         "Only an organization owner can invite a new owner.",
@@ -449,7 +458,7 @@ export class TenantsService {
     }
 
     await this.billingEnforcement?.assertQuotaAvailable(
-      tenant.organizationId,
+      organizationCtx.organizationId,
       "maxMembers",
     );
 
@@ -459,14 +468,14 @@ export class TenantsService {
         body: {
           email: input.email.toLowerCase(),
           role: input.role,
-          organizationId: tenant.organizationId,
+          organizationId: organizationCtx.organizationId,
           resend: input.resend ?? false,
         },
       });
       this.analyticsService.captureDomainEvent({
-        event: "tenant.member_invited",
-        distinctId: tenant.userId,
-        organizationId: tenant.organizationId,
+        event: "organization.member_invited",
+        distinctId: organizationCtx.userId,
+        organizationId: organizationCtx.organizationId,
         properties: {
           invited_role: input.role,
           resend: input.resend ?? false,
@@ -479,14 +488,14 @@ export class TenantsService {
   }
 
   async cancelInvitation(
-    tenant: AuthenticatedTenant,
+    organizationCtx: AuthenticatedOrganization,
     invitationId: string,
     rawHeaders: IncomingHttpHeaders,
   ) {
     const existing = await this.prismaService.raw.invitation.findFirst({
       where: {
         id: invitationId,
-        organizationId: tenant.organizationId,
+        organizationId: organizationCtx.organizationId,
       },
       select: { id: true, status: true },
     });

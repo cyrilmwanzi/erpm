@@ -8,7 +8,7 @@ import {
 import { CrmProvider, type Prisma } from "@scace/db";
 import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   decryptCrmSecret,
   encryptCrmSecret,
@@ -75,7 +75,7 @@ export class CrmConnectionService {
     };
   }
 
-  async getConnectionStatus(tenant: AuthenticatedTenant) {
+  async getConnectionStatus(tenant: AuthenticatedOrganization) {
     const conn = await this.prismaService.scoped.crmConnection.findFirst({
       where: { organizationId: tenant.organizationId },
     });
@@ -93,7 +93,7 @@ export class CrmConnectionService {
   }
 
   async upsertConnection(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: UpsertCrmConnectionInput,
     ipAddress?: string,
   ) {
@@ -192,7 +192,7 @@ export class CrmConnectionService {
     });
   }
 
-  async testConnection(tenant: AuthenticatedTenant, ipAddress?: string) {
+  async testConnection(tenant: AuthenticatedOrganization, ipAddress?: string) {
     const ctx = await this.resolveActiveConnection(tenant.organizationId, true);
     const probe = await this.customerMatesClient.pingWorkspace(ctx);
 
@@ -239,7 +239,7 @@ export class CrmConnectionService {
     };
   }
 
-  async deleteConnection(tenant: AuthenticatedTenant, ipAddress?: string) {
+  async deleteConnection(tenant: AuthenticatedOrganization, ipAddress?: string) {
     return this.prismaService.raw.$transaction(async (tx) => {
       const existing = await tx.crmConnection.findFirst({
         where: { organizationId: tenant.organizationId },

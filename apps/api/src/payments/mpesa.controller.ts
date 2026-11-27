@@ -21,12 +21,12 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { MpesaConfigService } from "./mpesa-config.service.js";
 import { MpesaPaymentService } from "./mpesa-payment.service.js";
 
@@ -128,7 +128,7 @@ const simulateC2bSchema = z.object({
 });
 
 @Controller("api/v1/payments/mpesa")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("mpesa")
 export class MpesaController {
   constructor(
@@ -140,14 +140,14 @@ export class MpesaController {
 
   @Get("config")
   @RequiredOrgPermissions({ payment: ["configure"] })
-  async getConfig(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getConfig(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.configService.getConfig(tenant);
   }
 
   @Put("config")
   @RequiredOrgPermissions({ payment: ["configure"] })
   async upsertConfig(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -165,7 +165,7 @@ export class MpesaController {
   @Post("config/rotate-token")
   @RequiredOrgPermissions({ payment: ["configure"] })
   async rotateCallbackToken(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.configService.rotateCallbackToken(tenant, req.ip);
@@ -174,7 +174,7 @@ export class MpesaController {
   @Post("config/test")
   @RequiredOrgPermissions({ payment: ["configure"] })
   async testConnection(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.configService.testConnection(tenant, req.ip);
@@ -183,7 +183,7 @@ export class MpesaController {
   @Post("config/register-c2b")
   @RequiredOrgPermissions({ payment: ["configure"] })
   async registerC2bUrls(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.configService.registerC2bUrls(tenant, req.ip);
@@ -192,7 +192,7 @@ export class MpesaController {
   @Get("transactions")
   @RequiredOrgPermissions({ payment: ["read"] })
   async listTransactions(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listTransactionsQuerySchema.safeParse(query ?? {});
@@ -209,7 +209,7 @@ export class MpesaController {
   @Get("transactions/:transactionId")
   @RequiredOrgPermissions({ payment: ["read"] })
   async getTransaction(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transactionId") transactionId: string,
   ) {
     return this.paymentService.getTransaction(tenant, transactionId);
@@ -218,7 +218,7 @@ export class MpesaController {
   @Post("transactions/:transactionId/query-status")
   @RequiredOrgPermissions({ payment: ["reconcile"] })
   async queryStatus(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transactionId") transactionId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -232,7 +232,7 @@ export class MpesaController {
   @Post("transactions/:transactionId/reconcile")
   @RequiredOrgPermissions({ payment: ["reconcile"] })
   async reconcileUnmatchedC2b(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transactionId") transactionId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -256,7 +256,7 @@ export class MpesaController {
   @Post("simulator/stk-callback")
   @RequiredOrgPermissions({ payment: ["record"] })
   async simulateStkCallback(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -274,7 +274,7 @@ export class MpesaController {
   @Post("simulator/c2b")
   @RequiredOrgPermissions({ payment: ["record"] })
   async simulateC2b(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {

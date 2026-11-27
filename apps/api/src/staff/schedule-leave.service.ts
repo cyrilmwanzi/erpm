@@ -15,7 +15,7 @@ import {
 } from "@scace/db";
 import { hasOrganizationPermission } from "../auth/permissions.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { StaffService } from "./staff.service.js";
 import {
   computeDailyShiftMinutes,
@@ -87,7 +87,7 @@ export class ScheduleLeaveService {
   ) {}
 
   async createSchedule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateWorkScheduleInput,
     ipAddress?: string,
   ) {
@@ -153,7 +153,7 @@ export class ScheduleLeaveService {
     });
   }
 
-  async listSchedules(tenant: AuthenticatedTenant, includeInactive = false) {
+  async listSchedules(tenant: AuthenticatedOrganization, includeInactive = false) {
     const items = await this.prismaService.scoped.workSchedule.findMany({
       where: {
         organizationId: tenant.organizationId,
@@ -172,7 +172,7 @@ export class ScheduleLeaveService {
   }
 
   async updateSchedule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     scheduleId: string,
     input: UpdateWorkScheduleInput,
     ipAddress?: string,
@@ -264,7 +264,7 @@ export class ScheduleLeaveService {
   }
 
   async assignScheduleToStaff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     staffId: string,
     workScheduleId: string,
     ipAddress?: string,
@@ -321,7 +321,7 @@ export class ScheduleLeaveService {
   }
 
   async createHoliday(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateHolidayInput,
     ipAddress?: string,
   ) {
@@ -381,7 +381,7 @@ export class ScheduleLeaveService {
     });
   }
 
-  async listHolidays(tenant: AuthenticatedTenant, query: ListHolidaysQuery) {
+  async listHolidays(tenant: AuthenticatedOrganization, query: ListHolidaysQuery) {
     const fromDate = query.from ? normalizeUtcDate(query.from) : undefined;
     const toDate = query.to ? normalizeUtcDate(query.to) : undefined;
 
@@ -420,7 +420,7 @@ export class ScheduleLeaveService {
   }
 
   async deleteHoliday(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     holidayId: string,
     ipAddress?: string,
   ) {
@@ -462,7 +462,7 @@ export class ScheduleLeaveService {
   }
 
   async requestTimeOff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateTimeOffInput,
     ipAddress?: string,
   ) {
@@ -601,7 +601,7 @@ export class ScheduleLeaveService {
     });
   }
 
-  async listTimeOff(tenant: AuthenticatedTenant, query: ListTimeOffQuery) {
+  async listTimeOff(tenant: AuthenticatedOrganization, query: ListTimeOffQuery) {
     const take = Math.min(Math.max(query.limit, 1), 100);
     const fromDate = query.from ? normalizeUtcDate(query.from) : undefined;
     const toDate = query.to ? normalizeUtcDate(query.to) : undefined;
@@ -647,7 +647,7 @@ export class ScheduleLeaveService {
   }
 
   async listMyTimeOff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: Omit<ListTimeOffQuery, "staffId">,
   ) {
     const mine = await this.staffService.getOrCreateMyProfile(tenant);
@@ -655,7 +655,7 @@ export class ScheduleLeaveService {
   }
 
   async reviewTimeOff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     requestId: string,
     decision: "APPROVED" | "REJECTED",
     reviewNote?: string | null,
@@ -721,7 +721,7 @@ export class ScheduleLeaveService {
   }
 
   async cancelTimeOff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     requestId: string,
     ipAddress?: string,
   ) {

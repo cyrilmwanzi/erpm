@@ -9,12 +9,12 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-  type TenantScopedRequest,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+  type OrganizationScopedRequest,
+} from "../organizations/organization.decorators.js";
 import { AnalyticsService } from "./analytics.service.js";
 import { SentryService } from "./sentry.service.js";
 
@@ -37,7 +37,7 @@ const listFlagsQuerySchema = z.object({
 });
 
 @Controller("api/v1/observability")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class ObservabilityController {
   constructor(
     @Inject(SentryService) private readonly sentryService: SentryService,
@@ -46,8 +46,8 @@ export class ObservabilityController {
   ) {}
 
   @Get("status")
-  @RequiredOrgPermissions({ tenantSettings: ["read"] })
-  getStatus(@Req() request: TenantScopedRequest & { requestId?: string }) {
+  @RequiredOrgPermissions({ organizationSettings: ["read"] })
+  getStatus(@Req() request: OrganizationScopedRequest & { requestId?: string }) {
     return {
       requestId: request.requestId ?? null,
       sentry: this.sentryService.getStatus(),
@@ -57,7 +57,7 @@ export class ObservabilityController {
 
   @Get("feature-flags")
   async getAllFeatureFlags(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() rawQuery: unknown,
   ) {
     const parsedQuery = listFlagsQuerySchema.safeParse(rawQuery ?? {});
@@ -123,7 +123,7 @@ export class ObservabilityController {
 
   @Get("feature-flags/:key")
   async getFeatureFlag(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("key") rawKey: string,
   ) {
     const parsedKey = flagKeySchema.safeParse(rawKey);

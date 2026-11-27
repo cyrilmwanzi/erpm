@@ -10,12 +10,12 @@ import {
   ItemType,
   ItemVariantKind,
   Prisma,
-  TenantContext,
+  OrganizationContext,
   VariantOptionDisplayType,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface OptionValueInput {
   code: string;
@@ -358,10 +358,10 @@ export class VariantsService {
     @Inject(RedisService) private readonly redisService: RedisService,
   ) {}
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
@@ -371,7 +371,7 @@ export class VariantsService {
     itemId: string,
   ): Promise<void> {
     try {
-      await this.redisService.invalidateTenantCache(
+      await this.redisService.invalidateOrganizationCache(
         organizationId,
         `item:${itemId}`,
       );
@@ -385,7 +385,7 @@ export class VariantsService {
   // ==========================================
 
   async createOption(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateVariantOptionInput,
     ipAddress?: string,
   ) {
@@ -476,7 +476,7 @@ export class VariantsService {
   }
 
   async listOptions(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListVariantOptionsQuery,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -510,7 +510,7 @@ export class VariantsService {
     return { organizationId, options };
   }
 
-  async getOption(tenant: AuthenticatedTenant, optionId: string) {
+  async getOption(tenant: AuthenticatedOrganization, optionId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const option = await this.prismaService.scoped.variantOption.findUnique({
       where: { id: optionId },
@@ -530,7 +530,7 @@ export class VariantsService {
   }
 
   async updateOption(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     optionId: string,
     input: UpdateVariantOptionInput,
     ipAddress?: string,
@@ -581,7 +581,7 @@ export class VariantsService {
   }
 
   async addOptionValues(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     optionId: string,
     values: OptionValueInput[],
     ipAddress?: string,
@@ -663,7 +663,7 @@ export class VariantsService {
   }
 
   async updateOptionValue(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     optionId: string,
     valueId: string,
     input: UpdateOptionValueInput,
@@ -829,7 +829,7 @@ export class VariantsService {
   }
 
   async createTemplate(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateTemplateInput,
     ipAddress?: string,
   ) {
@@ -841,7 +841,7 @@ export class VariantsService {
       const result = await this.prismaService.raw.$transaction(async (tx) => {
         let resolvedCurrency = input.currency;
         if (!resolvedCurrency) {
-          const settings = await tx.tenantSettings.findUnique({
+          const settings = await tx.organizationSettings.findUnique({
             where: { organizationId },
             select: { defaultCurrency: true },
           });
@@ -962,7 +962,7 @@ export class VariantsService {
   }
 
   async promoteToTemplate(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     input: PromoteToTemplateInput,
     ipAddress?: string,
@@ -1094,7 +1094,7 @@ export class VariantsService {
   }
 
   async configureTemplateOptions(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     templateId: string,
     options: TemplateOptionConfigInput[],
     ipAddress?: string,
@@ -1146,7 +1146,7 @@ export class VariantsService {
     return { organizationId, templateId, templateOptions };
   }
 
-  async listTemplates(tenant: AuthenticatedTenant, query: ListTemplatesQuery) {
+  async listTemplates(tenant: AuthenticatedOrganization, query: ListTemplatesQuery) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -1234,7 +1234,7 @@ export class VariantsService {
     return { organizationId, templates, nextCursor };
   }
 
-  async getTemplate(tenant: AuthenticatedTenant, templateId: string) {
+  async getTemplate(tenant: AuthenticatedOrganization, templateId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const template = await this.prismaService.scoped.item.findFirst({
@@ -1595,7 +1595,7 @@ export class VariantsService {
   }
 
   async previewMatrix(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     templateId: string,
     input: PreviewMatrixInput,
   ) {
@@ -1778,7 +1778,7 @@ export class VariantsService {
   }
 
   async generateMatrix(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     templateId: string,
     input: GenerateMatrixInput,
     ipAddress?: string,
@@ -1882,7 +1882,7 @@ export class VariantsService {
   }
 
   async createVariant(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     templateId: string,
     input: CreateVariantInput,
     ipAddress?: string,
@@ -2076,7 +2076,7 @@ export class VariantsService {
   }
 
   async resolveByAttributes(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     templateId: string,
     input: ResolveVariantByAttributesInput,
   ) {
@@ -2160,7 +2160,7 @@ export class VariantsService {
     };
   }
 
-  async getVariant(tenant: AuthenticatedTenant, variantId: string) {
+  async getVariant(tenant: AuthenticatedOrganization, variantId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const variant = await this.prismaService.scoped.item.findFirst({
@@ -2235,7 +2235,7 @@ export class VariantsService {
   }
 
   async updateVariant(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     variantId: string,
     input: UpdateVariantInput,
     ipAddress?: string,
@@ -2431,7 +2431,7 @@ export class VariantsService {
   }
 
   async bulkUpdateVariants(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     templateId: string,
     input: BulkUpdateVariantsInput,
     ipAddress?: string,

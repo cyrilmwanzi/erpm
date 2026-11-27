@@ -14,11 +14,11 @@ import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { OAuthProviderService } from "./oauth-provider.service.js";
 
 const authorizeSchema = z.object({
@@ -74,9 +74,9 @@ export class OAuthProviderController {
   }
 
   @Get("api/v1/oauth/authorize")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   async authorizeGet(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
@@ -84,9 +84,9 @@ export class OAuthProviderController {
   }
 
   @Post("api/v1/oauth/authorize")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   async authorizePost(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
@@ -94,7 +94,7 @@ export class OAuthProviderController {
   }
 
   private async handleAuthorize(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     rawInput: unknown,
     reply: FastifyReply,
   ) {
@@ -155,10 +155,10 @@ export class OAuthProviderController {
   }
 
   @Post("api/v1/oauth/device/verify")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ device: ["approve"] })
   async verifyDeviceCode(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = verifyDeviceCodeSchema.safeParse(body ?? {});

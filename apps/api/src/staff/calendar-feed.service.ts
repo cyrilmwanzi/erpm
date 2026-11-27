@@ -8,7 +8,7 @@ import {
 import { CalendarFeedScope, type Prisma } from "@scace/db";
 import { hasOrganizationPermission } from "../auth/permissions.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { AvailabilityService } from "./availability.service.js";
 import { StaffService } from "./staff.service.js";
 import {
@@ -75,7 +75,7 @@ export class CalendarFeedService {
   }
 
   async createFeed(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateCalendarFeedInput,
     ipAddress?: string,
   ) {
@@ -181,7 +181,7 @@ export class CalendarFeedService {
     };
   }
 
-  async listFeeds(tenant: AuthenticatedTenant) {
+  async listFeeds(tenant: AuthenticatedOrganization) {
     const canManageAll = hasOrganizationPermission(tenant.role, {
       calendar: ["manage"],
     });
@@ -205,7 +205,7 @@ export class CalendarFeedService {
   }
 
   async rotateFeedToken(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     feedId: string,
     ipAddress?: string,
   ) {
@@ -261,7 +261,7 @@ export class CalendarFeedService {
   }
 
   async revokeFeed(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     feedId: string,
     ipAddress?: string,
   ) {

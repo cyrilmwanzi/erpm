@@ -15,7 +15,7 @@ import {
   StockMovementType,
   StockTransferStatus,
   StorageEntityType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
@@ -28,7 +28,7 @@ import {
   AttachmentsService,
   STORED_OBJECT_SUMMARY_SELECT,
 } from "../storage/attachments.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   allocateAndDeductLotsInTx,
   recordAllocatedStockMovementsInTx,
@@ -112,7 +112,7 @@ export class InventoryService {
     private readonly attachmentsService: AttachmentsService,
   ) {}
 
-  async listBalances(tenant: AuthenticatedTenant, query: ListBalancesQuery) {
+  async listBalances(tenant: AuthenticatedOrganization, query: ListBalancesQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
 
@@ -172,7 +172,7 @@ export class InventoryService {
     };
   }
 
-  async listMovements(tenant: AuthenticatedTenant, query: ListMovementsQuery) {
+  async listMovements(tenant: AuthenticatedOrganization, query: ListMovementsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
 
@@ -202,7 +202,7 @@ export class InventoryService {
     };
   }
 
-  async listLots(tenant: AuthenticatedTenant, query: ListLotsQuery) {
+  async listLots(tenant: AuthenticatedOrganization, query: ListLotsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const lotNumber = query.lotNumber?.trim();
@@ -278,7 +278,7 @@ export class InventoryService {
     };
   }
 
-  async suggestLots(tenant: AuthenticatedTenant, input: SuggestLotsInput) {
+  async suggestLots(tenant: AuthenticatedOrganization, input: SuggestLotsInput) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const strategy = input.strategy ?? "FEFO";
     const includeExpired = input.includeExpired ?? false;
@@ -426,7 +426,7 @@ export class InventoryService {
     };
   }
 
-  async getLotTraceability(tenant: AuthenticatedTenant, lotId: string) {
+  async getLotTraceability(tenant: AuthenticatedOrganization, lotId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const lot = await this.prismaService.scoped.stockLot.findFirst({
@@ -567,7 +567,7 @@ export class InventoryService {
     };
   }
 
-  async listLotFiles(tenant: AuthenticatedTenant, lotId: string) {
+  async listLotFiles(tenant: AuthenticatedOrganization, lotId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const lot = await this.prismaService.scoped.stockLot.findFirst({
       where: { id: lotId, organizationId },
@@ -589,7 +589,7 @@ export class InventoryService {
   }
 
   async addLotFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     lotId: string,
     req: FastifyRequest,
     body: unknown,
@@ -611,7 +611,7 @@ export class InventoryService {
   }
 
   async removeLotFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     lotId: string,
     attachmentId: string,
     ipAddress?: string,
@@ -634,7 +634,7 @@ export class InventoryService {
   }
 
   async adjustStock(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: AdjustStockInput,
     ipAddress?: string,
   ) {
@@ -761,7 +761,7 @@ export class InventoryService {
   }
 
   async createTransfer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateTransferInput,
     ipAddress?: string,
   ) {
@@ -902,7 +902,7 @@ export class InventoryService {
   }
 
   async listTransfers(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListTransfersQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -941,7 +941,7 @@ export class InventoryService {
     };
   }
 
-  async getTransfer(tenant: AuthenticatedTenant, transferId: string) {
+  async getTransfer(tenant: AuthenticatedOrganization, transferId: string) {
     this.resolveVerifiedOrganizationId(tenant);
 
     const transfer = await this.prismaService.scoped.stockTransfer.findUnique({
@@ -965,7 +965,7 @@ export class InventoryService {
   }
 
   async dispatchTransfer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     transferId: string,
     ipAddress?: string,
   ) {
@@ -1119,7 +1119,7 @@ export class InventoryService {
   }
 
   async receiveTransfer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     transferId: string,
     ipAddress?: string,
   ) {
@@ -1338,7 +1338,7 @@ export class InventoryService {
   }
 
   async cancelTransfer(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     transferId: string,
     reason?: string,
     ipAddress?: string,
@@ -1460,10 +1460,10 @@ export class InventoryService {
     });
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

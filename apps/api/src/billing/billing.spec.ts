@@ -20,11 +20,11 @@ import {
 } from "@scace/db";
 import { generateRandomToken, sha256Hex } from "../auth/crypto.utils.js";
 import { hasOrganizationPermission } from "../auth/permissions.js";
-import { TenantGuard } from "../tenancy/tenant.guard.js";
+import { OrganizationGuard } from "../organizations/organization.guard.js";
 import {
   BILLING_FEATURE_KEY,
   BILLING_LOCK_EXEMPT_KEY,
-} from "../tenancy/tenant.decorators.js";
+} from "../organizations/organization.decorators.js";
 import {
   BillingEnforcementService,
   evaluateBillingStateSnapshot,
@@ -252,8 +252,8 @@ describe("Organization Billing, Free Trials & System Admin Governance", () => {
             if (where.id === "usr_regular") {
               return {
                 id: "usr_regular",
-                email: "owner@tenant.test",
-                name: "Tenant Owner",
+                email: "owner@org.test",
+                name: "Organization Owner",
                 emailVerified: true,
                 platformRole: PlatformRole.USER,
               };
@@ -331,7 +331,7 @@ describe("Organization Billing, Free Trials & System Admin Governance", () => {
     assert.equal(updatedRole, null);
   });
 
-  it("enforces billing lockouts and feature gates system-wide in TenantGuard while exempting billing recovery routes", async () => {
+  it("enforces billing lockouts and feature gates system-wide in OrganizationGuard while exempting billing recovery routes", async () => {
     const headers: Record<string, string> = {};
     const reflector = new Reflector();
     const mockPrisma = {
@@ -358,7 +358,7 @@ describe("Organization Billing, Free Trials & System Admin Governance", () => {
       assertFeatureEnabled: BillingEnforcementService.prototype.assertFeatureEnabled,
     } as unknown as BillingEnforcementService;
 
-    const guard = new TenantGuard(
+    const guard = new OrganizationGuard(
       reflector,
       mockPrisma,
       mockRedis,

@@ -20,7 +20,7 @@ import {
   Prisma,
   SalesInvoiceStatus,
   StockMovementType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
@@ -34,7 +34,7 @@ import {
   PricingEngineService,
   type CalculatedQuoteLine,
 } from "../pricing/pricing-engine.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import type { PrintableReceiptDocument } from "./document-renderer.utils.js";
 import {
   deductStockBalance as deductSharedStockBalance,
@@ -157,7 +157,7 @@ export class OrdersService {
   ) {}
 
   async posCheckout(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: PosCheckoutInput,
     ipAddress?: string,
   ) {
@@ -190,7 +190,7 @@ export class OrdersService {
         where: { id: organizationId },
         select: { id: true, name: true },
       }),
-      this.prismaService.raw.tenantSettings.findUnique({
+      this.prismaService.raw.organizationSettings.findUnique({
         where: { organizationId },
         select: { companyLegalName: true, defaultCurrency: true },
       }),
@@ -667,7 +667,7 @@ export class OrdersService {
   }
 
   async createB2bOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateB2bOrderInput,
     ipAddress?: string,
   ) {
@@ -684,7 +684,7 @@ export class OrdersService {
       this.prismaService.raw.customer.findFirst({
         where: { id: input.customerId, organizationId },
       }),
-      this.prismaService.raw.tenantSettings.findUnique({
+      this.prismaService.raw.organizationSettings.findUnique({
         where: { organizationId },
         select: { defaultCurrency: true },
       }),
@@ -864,7 +864,7 @@ export class OrdersService {
   }
 
   async updateDraftB2bOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     orderId: string,
     input: UpdateDraftB2bOrderInput,
     ipAddress?: string,
@@ -1062,7 +1062,7 @@ export class OrdersService {
   }
 
   async confirmB2bOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     orderId: string,
     input: ConfirmB2bOrderInput,
     ipAddress?: string,
@@ -1151,7 +1151,7 @@ export class OrdersService {
             where: { id: organizationId },
             select: { id: true, name: true },
           }),
-          tx.tenantSettings.findUnique({
+          tx.organizationSettings.findUnique({
             where: { organizationId },
             select: { companyLegalName: true },
           }),
@@ -1270,7 +1270,7 @@ export class OrdersService {
   }
 
   async fulfillB2bOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     orderId: string,
     input: FulfillB2bOrderInput,
     ipAddress?: string,
@@ -1453,7 +1453,7 @@ export class OrdersService {
   }
 
   async cancelB2bOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     orderId: string,
     reason?: string,
     ipAddress?: string,
@@ -1606,7 +1606,7 @@ export class OrdersService {
     return cancelled;
   }
 
-  async listOrders(tenant: AuthenticatedTenant, query: ListOrdersQuery) {
+  async listOrders(tenant: AuthenticatedOrganization, query: ListOrdersQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -1666,7 +1666,7 @@ export class OrdersService {
     };
   }
 
-  async getOrder(tenant: AuthenticatedTenant, orderId: string) {
+  async getOrder(tenant: AuthenticatedOrganization, orderId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const order = await this.prismaService.scoped.order.findUnique({
       where: { id: orderId },
@@ -2001,10 +2001,10 @@ export class OrdersService {
     return deductSharedStockBalance(tx, params);
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

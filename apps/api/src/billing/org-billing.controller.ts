@@ -14,11 +14,11 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   AllowWhenBillingLocked,
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { OrgBillingService } from "./org-billing.service.js";
 
 const listLimitQuerySchema = z.object({
@@ -50,7 +50,7 @@ const simulateStkSchema = z.object({
 });
 
 @Controller("api/v1/billing")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @AllowWhenBillingLocked()
 export class OrgBillingController {
   constructor(
@@ -60,20 +60,20 @@ export class OrgBillingController {
 
   @Get("subscription")
   @RequiredOrgPermissions({ billing: ["read"] })
-  async getSubscription(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getSubscription(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.orgBillingService.getSubscriptionOverview(tenant);
   }
 
   @Get("options")
   @RequiredOrgPermissions({ billing: ["read"] })
-  async getBillingOptions(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getBillingOptions(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.orgBillingService.getBillingOptions(tenant);
   }
 
   @Get("invoices")
   @RequiredOrgPermissions({ billing: ["read"] })
   async listInvoices(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listLimitQuerySchema.safeParse(query ?? {});
@@ -89,7 +89,7 @@ export class OrgBillingController {
   @Get("payments")
   @RequiredOrgPermissions({ billing: ["read"] })
   async listPayments(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listLimitQuerySchema.safeParse(query ?? {});
@@ -105,7 +105,7 @@ export class OrgBillingController {
   @Post("checkout")
   @RequiredOrgPermissions({ billing: ["manage"] })
   async createCheckout(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -126,7 +126,7 @@ export class OrgBillingController {
   @Post("payments/mpesa/stk-push")
   @RequiredOrgPermissions({ billing: ["manage"] })
   async initiateMpesaPayment(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -147,7 +147,7 @@ export class OrgBillingController {
   @Post("payments/mpesa/:transactionId/query-status")
   @RequiredOrgPermissions({ billing: ["manage"] })
   async queryMpesaStatus(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transactionId") transactionId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -161,7 +161,7 @@ export class OrgBillingController {
   @Post("payments/mpesa/simulator/callback")
   @RequiredOrgPermissions({ billing: ["manage"] })
   async simulateMpesaCallback(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {

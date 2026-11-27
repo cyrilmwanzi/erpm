@@ -16,11 +16,11 @@ import { SupplierStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { SuppliersService } from "./suppliers.service.js";
 
 const codeSchema = z
@@ -108,7 +108,7 @@ const upsertSupplierItemSchema = z.object({
 });
 
 @Controller("api/v1/suppliers")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class SuppliersController {
   constructor(
     @Inject(SuppliersService)
@@ -118,7 +118,7 @@ export class SuppliersController {
   @Post()
   @RequiredOrgPermissions({ supplier: ["create"] })
   async createSupplier(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -136,7 +136,7 @@ export class SuppliersController {
   @Get()
   @RequiredOrgPermissions({ supplier: ["read"] })
   async listSuppliers(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listSuppliersQuerySchema.safeParse(query ?? {});
@@ -153,7 +153,7 @@ export class SuppliersController {
   @Get(":supplierId")
   @RequiredOrgPermissions({ supplier: ["read"] })
   async getSupplier(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
   ) {
     return this.suppliersService.getSupplier(tenant, supplierId);
@@ -162,7 +162,7 @@ export class SuppliersController {
   @Patch(":supplierId")
   @RequiredOrgPermissions({ supplier: ["update"] })
   async updateSupplier(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -186,7 +186,7 @@ export class SuppliersController {
   @Post(":supplierId/archive")
   @RequiredOrgPermissions({ supplier: ["archive"] })
   async archiveSupplier(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -210,7 +210,7 @@ export class SuppliersController {
   @Post(":supplierId/restore")
   @RequiredOrgPermissions({ supplier: ["archive"] })
   async restoreSupplier(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -235,7 +235,7 @@ export class SuppliersController {
   @Get(":supplierId/items")
   @RequiredOrgPermissions({ supplier: ["read"] })
   async listSupplierItems(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
   ) {
     return this.suppliersService.listSupplierItems(tenant, supplierId);
@@ -244,7 +244,7 @@ export class SuppliersController {
   @Put(":supplierId/items")
   @RequiredOrgPermissions({ supplier: ["update"] })
   async upsertSupplierItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -268,7 +268,7 @@ export class SuppliersController {
   @Delete(":supplierId/items/:itemId")
   @RequiredOrgPermissions({ supplier: ["update"] })
   async removeSupplierItem(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("supplierId") supplierId: string,
     @Param("itemId") itemId: string,
     @Req() req: FastifyRequest,

@@ -18,7 +18,7 @@ import {
   StorageEntityType,
   SupplierClaimStatus,
   SupplierClaimType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
@@ -29,7 +29,7 @@ import {
   AttachmentsService,
   STORED_OBJECT_SUMMARY_SELECT,
 } from "../storage/attachments.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   type BulkQuantityInput,
   computeBaseUnitValueCents,
@@ -163,7 +163,7 @@ export class DeliveriesService {
     private readonly analyticsService: AnalyticsService,
   ) {}
 
-  async getDeliveryPreview(tenant: AuthenticatedTenant, poId: string) {
+  async getDeliveryPreview(tenant: AuthenticatedOrganization, poId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const po = await this.prismaService.raw.purchaseOrder.findFirst({
@@ -273,7 +273,7 @@ export class DeliveriesService {
   }
 
   async createDelivery(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     poId: string,
     input: CreateDeliveryInput,
     ipAddress?: string,
@@ -617,7 +617,7 @@ export class DeliveriesService {
   }
 
   async listDeliveries(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListDeliveriesQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -661,7 +661,7 @@ export class DeliveriesService {
     };
   }
 
-  async getDelivery(tenant: AuthenticatedTenant, deliveryId: string) {
+  async getDelivery(tenant: AuthenticatedOrganization, deliveryId: string) {
     this.resolveVerifiedOrganizationId(tenant);
 
     const delivery = await this.prismaService.scoped.goodsReceipt.findUnique({
@@ -685,7 +685,7 @@ export class DeliveriesService {
   }
 
   async submitQcInspection(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     input: SubmitQcInspectionInput,
     ipAddress?: string,
@@ -956,7 +956,7 @@ export class DeliveriesService {
   }
 
   async acceptDelivery(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     input: AcceptDeliveryInput,
     ipAddress?: string,
@@ -1324,7 +1324,7 @@ export class DeliveriesService {
   }
 
   async cancelDelivery(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     reason?: string,
     ipAddress?: string,
@@ -1384,7 +1384,7 @@ export class DeliveriesService {
   }
 
   async listQuarantineHolds(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListQuarantineQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -1428,7 +1428,7 @@ export class DeliveriesService {
   }
 
   async resolveQuarantineHold(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     holdId: string,
     input: ResolveQuarantineInput,
     ipAddress?: string,
@@ -1705,7 +1705,7 @@ export class DeliveriesService {
   }
 
   async listSupplierClaims(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListClaimsQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -1741,7 +1741,7 @@ export class DeliveriesService {
   }
 
   async updateSupplierClaim(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     claimId: string,
     input: UpdateClaimInput,
     ipAddress?: string,
@@ -1849,13 +1849,13 @@ export class DeliveriesService {
     });
   }
 
-  async listFiles(tenant: AuthenticatedTenant, deliveryId: string) {
+  async listFiles(tenant: AuthenticatedOrganization, deliveryId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     return this.attachmentsService.listForDelivery(tenant, deliveryId);
   }
 
   async addDeliveryFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     req: FastifyRequest,
     body: unknown,
@@ -1877,7 +1877,7 @@ export class DeliveriesService {
   }
 
   async addDeliveryLineFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     lineId: string,
     req: FastifyRequest,
@@ -1902,7 +1902,7 @@ export class DeliveriesService {
   }
 
   async removeDeliveryFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     attachmentId: string,
     ipAddress?: string,
@@ -2065,10 +2065,10 @@ export class DeliveriesService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

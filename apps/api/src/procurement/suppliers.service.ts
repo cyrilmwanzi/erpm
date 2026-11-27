@@ -5,10 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { ItemStatus, Prisma, SupplierStatus, TenantContext, type Supplier } from "@scace/db";
+import { ItemStatus, Prisma, SupplierStatus, OrganizationContext, type Supplier } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface CreateSupplierInput {
   code: string;
@@ -80,7 +80,7 @@ export class SuppliersService {
   ) {}
 
   async createSupplier(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateSupplierInput,
     ipAddress?: string,
   ): Promise<Supplier> {
@@ -91,7 +91,7 @@ export class SuppliersService {
       const supplier = await this.prismaService.raw.$transaction(async (tx) => {
         let resolvedCurrency = input.currency;
         if (!resolvedCurrency) {
-          const settings = await tx.tenantSettings.findUnique({
+          const settings = await tx.organizationSettings.findUnique({
             where: { organizationId },
             select: { defaultCurrency: true },
           });
@@ -154,7 +154,7 @@ export class SuppliersService {
     }
   }
 
-  async listSuppliers(tenant: AuthenticatedTenant, query: ListSuppliersQuery) {
+  async listSuppliers(tenant: AuthenticatedOrganization, query: ListSuppliersQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -191,11 +191,11 @@ export class SuppliersService {
   }
 
   async getSupplier(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     supplierId: string,
   ): Promise<Supplier> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
-    const cacheKey = `tenant:${organizationId}:supplier:${supplierId}`;
+    const cacheKey = `org:${organizationId}:supplier:${supplierId}`;
 
     try {
       const cached = await this.redisService.getJson<Supplier>(cacheKey);
@@ -224,7 +224,7 @@ export class SuppliersService {
   }
 
   async updateSupplier(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     supplierId: string,
     input: UpdateSupplierInput,
     ipAddress?: string,
@@ -311,7 +311,7 @@ export class SuppliersService {
   }
 
   async archiveSupplier(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     supplierId: string,
     reason?: string,
     ipAddress?: string,
@@ -364,7 +364,7 @@ export class SuppliersService {
   }
 
   async restoreSupplier(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     supplierId: string,
     targetStatus: "ACTIVE" | "INACTIVE" = SupplierStatus.ACTIVE,
     reason?: string,
@@ -417,7 +417,7 @@ export class SuppliersService {
     return restored;
   }
 
-  async listSupplierItems(tenant: AuthenticatedTenant, supplierId: string) {
+  async listSupplierItems(tenant: AuthenticatedOrganization, supplierId: string) {
     this.resolveVerifiedOrganizationId(tenant);
 
     const supplier = await this.prismaService.scoped.supplier.findUnique({
@@ -462,7 +462,7 @@ export class SuppliersService {
   }
 
   async upsertSupplierItem(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     supplierId: string,
     input: UpsertSupplierItemInput,
     ipAddress?: string,
@@ -602,7 +602,7 @@ export class SuppliersService {
   }
 
   async removeSupplierItem(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     supplierId: string,
     itemId: string,
     ipAddress?: string,
@@ -647,10 +647,10 @@ export class SuppliersService {
     });
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
@@ -660,7 +660,7 @@ export class SuppliersService {
     supplierId: string,
   ): Promise<void> {
     try {
-      await this.redisService.invalidateTenantCache(
+      await this.redisService.invalidateOrganizationCache(
         organizationId,
         `supplier:${supplierId}`,
       );

@@ -6,7 +6,7 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
+import type { OrganizationScopedRequest } from "../organizations/organization.decorators.js";
 import { AnalyticsService } from "./analytics.service.js";
 import {
   FEATURE_FLAG_METADATA_KEY,
@@ -32,14 +32,14 @@ export class FeatureFlagGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<TenantScopedRequest>();
+    const request = context.switchToHttp().getRequest<OrganizationScopedRequest>();
     const organizationId =
-      request.tenant?.organizationId ??
+      request.organization?.organizationId ??
       request.authContext?.organizationId ??
       request.session?.session?.activeOrganizationId ??
       null;
     const distinctId =
-      request.tenant?.userId ??
+      request.organization?.userId ??
       request.session?.user?.id ??
       (organizationId ? `org:${organizationId}` : "anonymous");
 
@@ -48,8 +48,8 @@ export class FeatureFlagGuard implements CanActivate {
       distinctId,
       organizationId,
       defaultValue: requirement.defaultEnabled ?? false,
-      personProperties: request.tenant?.role
-        ? { role: request.tenant.role }
+      personProperties: request.organization?.role
+        ? { role: request.organization.role }
         : undefined,
     });
 

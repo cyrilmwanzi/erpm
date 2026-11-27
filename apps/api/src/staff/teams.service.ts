@@ -13,7 +13,7 @@ import {
   TeamStatus,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { normalizeUtcDate } from "./staff.utils.js";
 
 export interface CreateTeamInput {
@@ -121,7 +121,7 @@ export class TeamsService {
   }
 
   async createTeam(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateTeamInput,
     ipAddress?: string,
   ) {
@@ -186,7 +186,7 @@ export class TeamsService {
     });
   }
 
-  async listTeams(tenant: AuthenticatedTenant, query: ListTeamsQuery) {
+  async listTeams(tenant: AuthenticatedOrganization, query: ListTeamsQuery) {
     const take = Math.min(Math.max(query.limit, 1), 100);
     const where: Prisma.TeamWhereInput = {
       organizationId: tenant.organizationId,
@@ -226,7 +226,7 @@ export class TeamsService {
     };
   }
 
-  async getTeam(tenant: AuthenticatedTenant, teamId: string) {
+  async getTeam(tenant: AuthenticatedOrganization, teamId: string) {
     const team = await this.prismaService.scoped.team.findFirst({
       where: { id: teamId, organizationId: tenant.organizationId },
       include: {
@@ -262,7 +262,7 @@ export class TeamsService {
   }
 
   async updateTeam(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     teamId: string,
     input: UpdateTeamInput,
     ipAddress?: string,
@@ -344,7 +344,7 @@ export class TeamsService {
   }
 
   async archiveTeam(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     teamId: string,
     ipAddress?: string,
   ) {
@@ -384,7 +384,7 @@ export class TeamsService {
   }
 
   async upsertTeamMember(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     teamId: string,
     input: UpsertTeamMemberInput,
     ipAddress?: string,
@@ -512,7 +512,7 @@ export class TeamsService {
   }
 
   async removeTeamMember(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     teamId: string,
     staffId: string,
     ipAddress?: string,

@@ -16,16 +16,16 @@ import { z } from "zod";
 import { ORGANIZATION_ROLE_NAMES } from "../auth/permissions.js";
 import {
   AllowWhenBillingLocked,
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
-import { TenantsService } from "./tenants.service.js";
+  type AuthenticatedOrganization,
+} from "./organization.decorators.js";
+import { OrganizationsService } from "./organizations.service.js";
 
 const organizationRoleEnum = z.enum(ORGANIZATION_ROLE_NAMES);
 
-const updateTenantSettingsSchema = z.object({
+const updateOrganizationSettingsSchema = z.object({
   companyLegalName: z.string().trim().min(1).max(200).nullable().optional(),
   defaultCurrency: z
     .string()
@@ -57,54 +57,57 @@ const auditQuerySchema = z.object({
   cursor: z.string().trim().min(1).optional(),
 });
 
-@Controller("api/v1/tenants")
-@RequireActiveTenant()
-export class TenantsController {
+@Controller("api/v1/organizations")
+@RequireActiveOrganization()
+export class OrganizationsController {
   constructor(
-    @Inject(TenantsService) private readonly tenantsService: TenantsService,
+    @Inject(OrganizationsService)
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   @Get("current")
   @AllowWhenBillingLocked()
-  @RequiredOrgPermissions({ tenantSettings: ["read"] })
-  async getCurrentTenant(@CurrentTenant() tenant: AuthenticatedTenant) {
-    return this.tenantsService.getCurrentTenantOverview(tenant);
+  @RequiredOrgPermissions({ organizationSettings: ["read"] })
+  async getCurrentOrganization(
+    @CurrentOrganization() org: AuthenticatedOrganization,
+  ) {
+    return this.organizationsService.getCurrentOrganizationOverview(org);
   }
 
   @Get("permissions")
   @AllowWhenBillingLocked()
-  getPermissions(@CurrentTenant() tenant: AuthenticatedTenant) {
-    return this.tenantsService.getEffectivePermissions(tenant);
+  getPermissions(@CurrentOrganization() org: AuthenticatedOrganization) {
+    return this.organizationsService.getEffectivePermissions(org);
   }
 
   @Patch("settings")
-  @RequiredOrgPermissions({ tenantSettings: ["update"] })
+  @RequiredOrgPermissions({ organizationSettings: ["update"] })
   async updateSettings(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
-    const parsed = updateTenantSettingsSchema.safeParse(body);
+    const parsed = updateOrganizationSettingsSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException({
-        message: "Invalid tenant settings payload.",
+        message: "Invalid organization settings payload.",
         issues: parsed.error.issues,
       });
     }
 
-    return this.tenantsService.updateSettings(tenant, parsed.data, req.ip);
+    return this.organizationsService.updateSettings(org, parsed.data, req.ip);
   }
 
   @Get("members")
   @RequiredOrgPermissions({ ac: ["read"] })
-  async listMembers(@CurrentTenant() tenant: AuthenticatedTenant) {
-    return this.tenantsService.listMembers(tenant);
+  async listMembers(@CurrentOrganization() org: AuthenticatedOrganization) {
+    return this.organizationsService.listMembers(org);
   }
 
   @Patch("members/:memberId/role")
   @RequiredOrgPermissions({ member: ["update"] })
   async updateMemberRole(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Param("memberId") memberId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -117,8 +120,8 @@ export class TenantsController {
       });
     }
 
-    return this.tenantsService.updateMemberRole(
-      tenant,
+    return this.organizationsService.updateMemberRole(
+      org,
       memberId,
       parsed.data.role,
       req.headers,
@@ -128,17 +131,17 @@ export class TenantsController {
   @Delete("members/:memberId")
   @RequiredOrgPermissions({ member: ["delete"] })
   async removeMember(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Param("memberId") memberId: string,
     @Req() req: FastifyRequest,
   ) {
-    return this.tenantsService.removeMember(tenant, memberId, req.headers);
+    return this.organizationsService.removeMember(org, memberId, req.headers);
   }
 
   @Get("invitations")
   @RequiredOrgPermissions({ invitation: ["create"] })
   async listInvitations(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listInvitationsQuerySchema.safeParse(query ?? {});
@@ -149,13 +152,13 @@ export class TenantsController {
       });
     }
 
-    return this.tenantsService.listInvitations(tenant, parsed.data.status);
+    return this.organizationsService.listInvitations(org, parsed.data.status);
   }
 
   @Post("invitations")
   @RequiredOrgPermissions({ invitation: ["create"] })
   async createInvitation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -167,18 +170,22 @@ export class TenantsController {
       });
     }
 
-    return this.tenantsService.createInvitation(tenant, parsed.data, req.headers);
+    return this.organizationsService.createInvitation(
+      org,
+      parsed.data,
+      req.headers,
+    );
   }
 
   @Delete("invitations/:invitationId")
   @RequiredOrgPermissions({ invitation: ["cancel"] })
   async cancelInvitation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Param("invitationId") invitationId: string,
     @Req() req: FastifyRequest,
   ) {
-    return this.tenantsService.cancelInvitation(
-      tenant,
+    return this.organizationsService.cancelInvitation(
+      org,
       invitationId,
       req.headers,
     );
@@ -195,7 +202,7 @@ export class TenantsController {
       });
     }
 
-    return this.tenantsService.listAuditLogs(
+    return this.organizationsService.listAuditLogs(
       parsed.data.limit,
       parsed.data.cursor,
     );

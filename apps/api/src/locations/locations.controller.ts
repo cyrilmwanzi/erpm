@@ -14,11 +14,11 @@ import { LocationStatus, LocationType } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { LocationsService } from "./locations.service.js";
 
 const locationTypeEnum = z.enum([
@@ -82,7 +82,7 @@ const restoreLocationSchema = z.object({
 });
 
 @Controller("api/v1/locations")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class LocationsController {
   constructor(
     @Inject(LocationsService)
@@ -92,7 +92,7 @@ export class LocationsController {
   @Post()
   @RequiredOrgPermissions({ location: ["create"] })
   async createLocation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -110,7 +110,7 @@ export class LocationsController {
   @Get()
   @RequiredOrgPermissions({ location: ["read"] })
   async listLocations(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listLocationsQuerySchema.safeParse(query ?? {});
@@ -127,7 +127,7 @@ export class LocationsController {
   @Get(":locationId")
   @RequiredOrgPermissions({ location: ["read"] })
   async getLocation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("locationId") locationId: string,
   ) {
     return this.locationsService.getLocation(tenant, locationId);
@@ -136,7 +136,7 @@ export class LocationsController {
   @Patch(":locationId")
   @RequiredOrgPermissions({ location: ["update"] })
   async updateLocation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("locationId") locationId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -160,7 +160,7 @@ export class LocationsController {
   @Post(":locationId/archive")
   @RequiredOrgPermissions({ location: ["archive"] })
   async archiveLocation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("locationId") locationId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -184,7 +184,7 @@ export class LocationsController {
   @Post(":locationId/restore")
   @RequiredOrgPermissions({ location: ["archive"] })
   async restoreLocation(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("locationId") locationId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

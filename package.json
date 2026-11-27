@@ -10,10 +10,10 @@
   },
   "scripts": {
     "predev": "node -e \"import('node:fs').then(fs => { if (!fs.existsSync('packages/db/dist/index.js') || !fs.existsSync('packages/db/src/generated/prisma/client.ts')) process.exit(1); })\" || pnpm --filter @scace/db build",
-    "dev": "pnpm --filter @scace/api dev",
-    "build": "pnpm --filter @scace/db build && pnpm --filter @scace/api build",
-    "lint": "pnpm --filter @scace/db build && pnpm --filter @scace/db lint && pnpm --filter @scace/api lint",
-    "typecheck": "pnpm --filter @scace/db build && pnpm --filter @scace/db typecheck && pnpm --filter @scace/api typecheck",
+    "dev": "node scripts/dev-preview.mjs",
+    "build": "pnpm --filter @scace/db build && pnpm --filter @scace/api build && pnpm --filter @scace/docs build",
+    "lint": "pnpm --filter @scace/db build && pnpm --filter @scace/db lint && pnpm --filter @scace/api lint && pnpm --filter @scace/docs lint",
+    "typecheck": "pnpm --filter @scace/db build && pnpm --filter @scace/db typecheck && pnpm --filter @scace/api typecheck && pnpm --filter @scace/docs typecheck",
     "test": "pnpm --filter @scace/db build && pnpm --filter @scace/db test && pnpm --filter @scace/api test",
     "start": "node apps/api/dist/main.js",
     "db:generate": "pnpm --filter @scace/db db:generate",
@@ -25,7 +25,7 @@
     "release:version": "node scripts/release.mjs version",
     "release": "node scripts/release.mjs run",
     "release:publish-ci": "node scripts/release.mjs publish-ci",
-    "clean": "pnpm --filter @scace/db clean && pnpm --filter @scace/api clean && rm -rf dist .turbo"
+    "clean": "pnpm --filter @scace/db clean && pnpm --filter @scace/api clean && pnpm --filter @scace/docs clean && rm -rf dist .turbo"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

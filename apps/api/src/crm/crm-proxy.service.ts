@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { ItemStatus, type Prisma } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { CrmBridgeService, type LinkDealItemInput } from "./crm-bridge.service.js";
 import { CrmConnectionService } from "./crm-connection.service.js";
 import {
@@ -240,7 +240,7 @@ export class CrmProxyService {
   }
 
   async listResources(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     resource: CustomerMatesResource,
     query: CrmListQuery,
   ) {
@@ -288,7 +288,7 @@ export class CrmProxyService {
   }
 
   async getResource(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     resource: CustomerMatesResource,
     id: string,
   ) {
@@ -305,7 +305,7 @@ export class CrmProxyService {
   }
 
   async createResource(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     resource: CustomerMatesResource,
     payload: Record<string, unknown>,
     ipAddress?: string,
@@ -405,7 +405,7 @@ export class CrmProxyService {
   }
 
   async updateResource(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     resource: CustomerMatesResource,
     id: string,
     payload: Record<string, unknown>,
@@ -450,7 +450,7 @@ export class CrmProxyService {
   }
 
   async deleteResource(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     resource: CustomerMatesResource,
     id: string,
     ipAddress?: string,
@@ -489,7 +489,7 @@ export class CrmProxyService {
     return result;
   }
 
-  async getDealWithContext(tenant: AuthenticatedTenant, dealId: string) {
+  async getDealWithContext(tenant: AuthenticatedOrganization, dealId: string) {
     const ctx = await this.connectionService.resolveActiveConnection(
       tenant.organizationId,
     );

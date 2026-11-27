@@ -81,6 +81,16 @@ jobs:
           pnpm --filter @scace/sdk build
           pnpm --filter @scace/sdk test
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docs Docker image build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/docs/Dockerfile
+          push: false
+
       - name: Create Release Pull Request or Publish/Tag Releases
         id: changesets
         uses: changesets/action@v1

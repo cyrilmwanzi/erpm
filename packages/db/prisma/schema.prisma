@@ -94,9 +94,9 @@ model Organization {
   createdAt      DateTime        @default(now())
   metadata       String?
   members        Member[]
-  invitations    Invitation[]
-  tenantSettings TenantSettings?
-  auditLogs      AuditLog[]
+  invitations          Invitation[]
+  organizationSettings OrganizationSettings?
+  auditLogs            AuditLog[]
   items              Item[]
   itemRevisions      ItemRevision[]
   locations          Location[]
@@ -224,10 +224,10 @@ model Invitation {
 }
 
 // ==========================================
-// Multi-Tenant ERP Base Scaffold Models
+// Multi-Organization ERP Base Scaffold Models
 // ==========================================
 
-model TenantSettings {
+model OrganizationSettings {
   id                   String       @id @default(cuid())
   organizationId       String       @unique
   organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

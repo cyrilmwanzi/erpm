@@ -11,11 +11,11 @@ import {
   PaymentMethod,
   Prisma,
   SalesInvoiceStatus,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import type {
   PrintableInvoiceDocument,
   PrintableParty,
@@ -90,7 +90,7 @@ export class InvoicesPaymentsService {
   ) {}
 
   async createInvoiceFromOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     orderId: string,
     input: CreateInvoiceFromOrderInput,
     ipAddress?: string,
@@ -118,7 +118,7 @@ export class InvoicesPaymentsService {
             where: { id: organizationId },
             select: { id: true, name: true },
           }),
-          tx.tenantSettings.findUnique({
+          tx.organizationSettings.findUnique({
             where: { organizationId },
             select: { companyLegalName: true },
           }),
@@ -275,7 +275,7 @@ export class InvoicesPaymentsService {
   }
 
   async issueInvoice(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     invoiceId: string,
     dueAt?: string | null,
     ipAddress?: string,
@@ -369,7 +369,7 @@ export class InvoicesPaymentsService {
   }
 
   async voidInvoice(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     invoiceId: string,
     reason?: string,
     ipAddress?: string,
@@ -457,7 +457,7 @@ export class InvoicesPaymentsService {
   }
 
   async recordCashPayment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     invoiceId: string,
     input: RecordCashPaymentInput,
     ipAddress?: string,
@@ -734,7 +734,7 @@ export class InvoicesPaymentsService {
     return result;
   }
 
-  async listInvoices(tenant: AuthenticatedTenant, query: ListInvoicesQuery) {
+  async listInvoices(tenant: AuthenticatedOrganization, query: ListInvoicesQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -794,7 +794,7 @@ export class InvoicesPaymentsService {
     };
   }
 
-  async getInvoice(tenant: AuthenticatedTenant, invoiceId: string) {
+  async getInvoice(tenant: AuthenticatedOrganization, invoiceId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const invoice = await this.prismaService.scoped.salesInvoice.findUnique({
       where: { id: invoiceId },
@@ -820,7 +820,7 @@ export class InvoicesPaymentsService {
   }
 
   async buildInvoicePrintableDocument(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     invoiceId: string,
   ): Promise<PrintableInvoiceDocument> {
     const invoice = await this.getInvoice(tenant, invoiceId);
@@ -923,7 +923,7 @@ export class InvoicesPaymentsService {
     };
   }
 
-  async listPayments(tenant: AuthenticatedTenant, query: ListPaymentsQuery) {
+  async listPayments(tenant: AuthenticatedOrganization, query: ListPaymentsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
 
@@ -960,7 +960,7 @@ export class InvoicesPaymentsService {
     };
   }
 
-  async getPayment(tenant: AuthenticatedTenant, paymentId: string) {
+  async getPayment(tenant: AuthenticatedOrganization, paymentId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const payment = await this.prismaService.scoped.customerPayment.findUnique({
       where: { id: paymentId },
@@ -977,7 +977,7 @@ export class InvoicesPaymentsService {
     return payment;
   }
 
-  async listReceipts(tenant: AuthenticatedTenant, query: ListReceiptsQuery) {
+  async listReceipts(tenant: AuthenticatedOrganization, query: ListReceiptsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -1033,7 +1033,7 @@ export class InvoicesPaymentsService {
     };
   }
 
-  async getReceipt(tenant: AuthenticatedTenant, receiptId: string) {
+  async getReceipt(tenant: AuthenticatedOrganization, receiptId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const receipt = await this.prismaService.scoped.paymentReceipt.findUnique({
       where: { id: receiptId },
@@ -1051,7 +1051,7 @@ export class InvoicesPaymentsService {
   }
 
   async buildReceiptPrintableDocument(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     receiptId: string,
   ): Promise<PrintableReceiptDocument> {
     const receipt = await this.getReceipt(tenant, receiptId);
@@ -1087,10 +1087,10 @@ export class InvoicesPaymentsService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

@@ -10,7 +10,7 @@ import { Reflector } from "@nestjs/core";
 import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
-import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
+import type { OrganizationScopedRequest } from "../organizations/organization.decorators.js";
 import { auth } from "./auth.config.js";
 import { OAuthProviderService } from "./oauth-provider.service.js";
 import { PatService } from "./pat.service.js";
@@ -47,7 +47,7 @@ export class UnifiedAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<TenantScopedRequest>();
+    const request = context.switchToHttp().getRequest<OrganizationScopedRequest>();
     const isPublic = this.reflector.getAllAndOverride<boolean>("PUBLIC", [
       context.getHandler(),
       context.getClass(),
@@ -147,7 +147,7 @@ export class UnifiedAuthGuard implements CanActivate {
     }
 
     if (session?.user?.id) {
-      request.session = session as TenantScopedRequest["session"];
+      request.session = session as OrganizationScopedRequest["session"];
       request.authContext = {
         authMethod: bearer ? "BEARER_SESSION" : "COOKIE_SESSION",
         organizationId:
@@ -167,7 +167,7 @@ export class UnifiedAuthGuard implements CanActivate {
   }
 }
 
-export function assertHumanUserSession(request: TenantScopedRequest): void {
+export function assertHumanUserSession(request: OrganizationScopedRequest): void {
   if (request.authContext?.isServicePrincipal) {
     throw new ForbiddenException("This endpoint requires a human user identity.");
   }

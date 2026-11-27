@@ -17,11 +17,11 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { getEnv } from "../config/env.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ORGANIZATION_ROLE_NAMES } from "./permissions.js";
 import { SsoService } from "./sso.service.js";
 
@@ -206,17 +206,19 @@ export class SsoController {
   }
 
   @Get("config")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ ssoConfig: ["read"] })
-  async listTenantConfig(@CurrentTenant() tenant: AuthenticatedTenant) {
-    return this.ssoService.listTenantProviders(tenant);
+  async listOrganizationConfig(
+    @CurrentOrganization() org: AuthenticatedOrganization,
+  ) {
+    return this.ssoService.listOrganizationProviders(org);
   }
 
   @Post("config")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ ssoConfig: ["configure"] })
-  async createTenantConfig(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+  async createOrganizationConfig(
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = createSsoSchema.safeParse(body);
@@ -226,14 +228,14 @@ export class SsoController {
         issues: parsed.error.issues,
       });
     }
-    return this.ssoService.createTenantProvider(tenant, parsed.data);
+    return this.ssoService.createOrganizationProvider(org, parsed.data);
   }
 
   @Patch("config/:idOrKey")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ ssoConfig: ["configure"] })
-  async updateTenantConfig(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+  async updateOrganizationConfig(
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Param("idOrKey") idOrKey: string,
     @Body() body: unknown,
   ) {
@@ -244,16 +246,16 @@ export class SsoController {
         issues: parsed.error.issues,
       });
     }
-    return this.ssoService.updateTenantProvider(tenant, idOrKey, parsed.data);
+    return this.ssoService.updateOrganizationProvider(org, idOrKey, parsed.data);
   }
 
   @Delete("config/:idOrKey")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ ssoConfig: ["configure"] })
-  async deleteTenantConfig(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+  async deleteOrganizationConfig(
+    @CurrentOrganization() org: AuthenticatedOrganization,
     @Param("idOrKey") idOrKey: string,
   ) {
-    return this.ssoService.deleteTenantProvider(tenant, idOrKey);
+    return this.ssoService.deleteOrganizationProvider(org, idOrKey);
   }
 }

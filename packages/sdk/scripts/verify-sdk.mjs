@@ -102,7 +102,7 @@ const sdk = esm.createScaceClient({
 // Verify namespace structure
 for (const key of [
   "auth",
-  "tenants",
+  "organizations",
   "invitations",
   "items",
   "variants",
@@ -138,6 +138,24 @@ for (const key of [
   "systemBilling",
 ]) {
   assert.ok(key in sdk, `Missing namespace sdk.${key}`);
+}
+for (const orgKey of [
+  "getCurrentOrganization",
+  "getPermissions",
+  "updateSettings",
+  "listMembers",
+  "updateMemberRole",
+  "removeMember",
+  "listInvitations",
+  "createInvitation",
+  "cancelInvitation",
+  "getAuditLogs",
+]) {
+  assert.equal(
+    typeof sdk.organizations[orgKey],
+    "function",
+    `Missing sdk.organizations.${orgKey}`,
+  );
 }
 for (const billingKey of [
   "getSubscription",

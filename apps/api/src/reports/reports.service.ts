@@ -20,7 +20,7 @@ import {
   ReportFrequency,
   ReportRunStatus,
   StorageEntityType,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { CommunicationOutboxService } from "../communications/communication-outbox.service.js";
 import { getEnv } from "../config/env.js";
@@ -32,7 +32,7 @@ import {
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { StorageService } from "../storage/storage.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   computeNextRunAt,
   type GeneratedReportResult,
@@ -228,7 +228,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async queryDomainReport(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     domain: ReportDomain,
     filters: ReportFiltersInput,
   ): Promise<GeneratedReportResult> {
@@ -237,7 +237,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async exportReport(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     domain: ReportDomain,
     format: ReportFormat,
     filters: ReportFiltersInput,
@@ -874,14 +874,14 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   // ==========================================
 
   async dispatchReport(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: DispatchReportInput,
     ipAddress?: string,
   ) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     return this.executeReportRun({
       organizationId,
-      tenant,
+      organization: tenant,
       scheduleId: null,
       domain: input.domain,
       format: input.format,
@@ -895,7 +895,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async createSchedule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateReportScheduleInput,
     ipAddress?: string,
   ) {
@@ -954,7 +954,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async listSchedules(tenant: AuthenticatedTenant) {
+  async listSchedules(tenant: AuthenticatedOrganization) {
     this.resolveVerifiedOrganizationId(tenant);
     const items = await this.prismaService.scoped.reportSchedule.findMany({
       orderBy: [{ isActive: "desc" }, { nextRunAt: "asc" }],
@@ -966,7 +966,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async updateSchedule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     scheduleId: string,
     input: UpdateReportScheduleInput,
     ipAddress?: string,
@@ -1041,7 +1041,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async deleteSchedule(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     scheduleId: string,
     ipAddress?: string,
   ) {
@@ -1075,7 +1075,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async runScheduleNow(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     scheduleId: string,
     ipAddress?: string,
   ) {
@@ -1106,19 +1106,20 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
       createdByUserId: string | null;
     },
     trigger: "MANUAL" | "SCHEDULED",
-    actorTenant?: AuthenticatedTenant,
+    actorOrganization?: AuthenticatedOrganization,
     ipAddress?: string,
   ) {
-    const syntheticTenant: AuthenticatedTenant = actorTenant ?? {
-      organizationId: schedule.organizationId,
-      memberId: "system",
-      role: "owner",
-      userId: schedule.createdByUserId ?? "system",
-    };
+    const syntheticOrganization: AuthenticatedOrganization =
+      actorOrganization ?? {
+        organizationId: schedule.organizationId,
+        memberId: "system",
+        role: "owner",
+        userId: schedule.createdByUserId ?? "system",
+      };
 
     const runResult = await this.executeReportRun({
       organizationId: schedule.organizationId,
-      tenant: syntheticTenant,
+      organization: syntheticOrganization,
       scheduleId: schedule.id,
       domain: schedule.domain,
       format: schedule.format,
@@ -1156,7 +1157,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
 
   private async executeReportRun(params: {
     organizationId: string;
-    tenant: AuthenticatedTenant;
+    organization: AuthenticatedOrganization;
     scheduleId: string | null;
     domain: ReportDomain;
     format: ReportFormat;
@@ -1178,7 +1179,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
         format: params.format,
         status: ReportRunStatus.RUNNING,
         filters: params.filters as Prisma.InputJsonValue,
-        triggeredByUserId: params.tenant.userId,
+        triggeredByUserId: params.organization.userId,
         startedAt: now,
       },
     });
@@ -1208,7 +1209,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
 
       try {
         const stored = await this.storageService.uploadDirect(
-          params.tenant,
+          params.organization,
           {
             buffer: artifactBuffer,
             filename,
@@ -1279,7 +1280,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
 
       this.analyticsService.captureDomainEvent({
         event: "report.run_completed",
-        distinctId: params.tenant.userId,
+        distinctId: params.organization.userId,
         organizationId: params.organizationId,
         properties: {
           report_run_id: updatedRun.id,
@@ -1312,7 +1313,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async listRuns(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: { domain?: ReportDomain; scheduleId?: string; limit: number; cursor?: string },
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -1339,7 +1340,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async getRun(tenant: AuthenticatedTenant, runId: string) {
+  async getRun(tenant: AuthenticatedOrganization, runId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const run = await this.prismaService.scoped.reportRun.findFirst({
       where: { id: runId },
@@ -1353,7 +1354,7 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
     return run;
   }
 
-  async downloadRunArtifact(tenant: AuthenticatedTenant, runId: string) {
+  async downloadRunArtifact(tenant: AuthenticatedOrganization, runId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const run = await this.prismaService.raw.reportRun.findFirst({
       where: { id: runId, organizationId },
@@ -1404,10 +1405,10 @@ export class ReportsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

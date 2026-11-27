@@ -11,11 +11,11 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { PatService } from "./pat.service.js";
 import { ALL_ERP_SCOPES } from "./permissions.js";
 
@@ -35,7 +35,7 @@ const listPatQuerySchema = z.object({
 });
 
 @Controller("api/v1/auth/pats")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class PatController {
   constructor(@Inject(PatService) private readonly patService: PatService) {}
 
@@ -48,7 +48,7 @@ export class PatController {
   @Post()
   @RequiredOrgPermissions({ apiToken: ["create"] })
   async createPat(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = createPatSchema.safeParse(body);
@@ -64,7 +64,7 @@ export class PatController {
   @Get()
   @RequiredOrgPermissions({ apiToken: ["read"] })
   async listPats(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listPatQuerySchema.safeParse(query ?? {});
@@ -80,7 +80,7 @@ export class PatController {
   @Post(":patId/revoke")
   @RequiredOrgPermissions({ apiToken: ["revoke"] })
   async revokePatPost(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("patId") patId: string,
   ) {
     return this.patService.revokePat(tenant, patId);
@@ -89,7 +89,7 @@ export class PatController {
   @Delete(":patId")
   @RequiredOrgPermissions({ apiToken: ["revoke"] })
   async revokePatDelete(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("patId") patId: string,
   ) {
     return this.patService.revokePat(tenant, patId);

@@ -9,7 +9,7 @@ import { type Prisma } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   generateRandomToken,
   matchesIpAllowlist,
@@ -76,7 +76,7 @@ export class PatService {
     }
   }
 
-  async createPat(tenant: AuthenticatedTenant, input: CreatePatInput) {
+  async createPat(tenant: AuthenticatedOrganization, input: CreatePatInput) {
     if (tenant.authMethod && tenant.authMethod !== "COOKIE_SESSION" && tenant.authMethod !== "BEARER_SESSION") {
       throw new ForbiddenException(
         "Personal Access Tokens can only be issued from an authenticated user session.",
@@ -176,7 +176,7 @@ export class PatService {
     };
   }
 
-  async listPats(tenant: AuthenticatedTenant, includeAll = false) {
+  async listPats(tenant: AuthenticatedOrganization, includeAll = false) {
     const roles = parseRoleNames(tenant.role);
     const isAdminOrOwner = roles.includes("owner") || roles.includes("admin");
 
@@ -214,7 +214,7 @@ export class PatService {
     return { items };
   }
 
-  async revokePat(tenant: AuthenticatedTenant, patId: string) {
+  async revokePat(tenant: AuthenticatedOrganization, patId: string) {
     const existing = await this.prismaService.scoped.personalAccessToken.findUnique({
       where: { id: patId },
       select: {

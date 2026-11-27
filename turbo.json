@@ -62,6 +62,22 @@
     "@scace/sdk#test": {
       "dependsOn": ["@scace/sdk#build"]
     },
+    "@scace/docs#docs:generate": {
+      "dependsOn": ["@scace/db#build"],
+      "inputs": ["scripts/generate-docs.mjs", "../../apps/api/src/**/*.ts"],
+      "outputs": ["src/generated/**"]
+    },
+    "@scace/docs#build": {
+      "dependsOn": ["@scace/db#build"],
+      "inputs": ["$TURBO_DEFAULT$", "../../apps/api/src/**/*.ts"],
+      "outputs": ["dist/**", "src/generated/**", "src/routeTree.gen.ts"]
+    },
+    "@scace/docs#lint": {
+      "dependsOn": ["@scace/docs#build"]
+    },
+    "@scace/docs#typecheck": {
+      "dependsOn": ["@scace/docs#build"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],

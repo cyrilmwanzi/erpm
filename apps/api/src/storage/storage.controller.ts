@@ -17,11 +17,11 @@ import { StorageEntityType, StoredObjectStatus } from "@scace/db";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { StorageService } from "./storage.service.js";
 
 const entityTypeEnum = z.enum([
@@ -112,7 +112,7 @@ function readMultipartField(
 }
 
 @Controller("api/v1/storage")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class StorageController {
   constructor(
     @Inject(StorageService) private readonly storageService: StorageService,
@@ -120,14 +120,14 @@ export class StorageController {
 
   @Get("quota")
   @RequiredOrgPermissions({ storage: ["read"] })
-  async getQuota(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getQuota(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.storageService.getQuota(tenant);
   }
 
   @Patch("quota")
   @RequiredOrgPermissions({ storage: ["manage"] })
   async updateQuota(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -149,7 +149,7 @@ export class StorageController {
   @Post("uploads/presign")
   @RequiredOrgPermissions({ storage: ["upload"] })
   async createPresignedUpload(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -171,7 +171,7 @@ export class StorageController {
   @Post("objects")
   @RequiredOrgPermissions({ storage: ["upload"] })
   async uploadDirect(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     if (!req.isMultipart()) {
@@ -261,7 +261,7 @@ export class StorageController {
   @Post("objects/:objectId/complete")
   @RequiredOrgPermissions({ storage: ["upload"] })
   async completeUpload(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("objectId") objectId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -271,7 +271,7 @@ export class StorageController {
   @Get("objects")
   @RequiredOrgPermissions({ storage: ["read"] })
   async listObjects(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listObjectsQuerySchema.safeParse(query ?? {});
@@ -288,7 +288,7 @@ export class StorageController {
   @Get("objects/:objectId")
   @RequiredOrgPermissions({ storage: ["read"] })
   async getObjectMetadata(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("objectId") objectId: string,
   ) {
     return this.storageService.getObjectMetadata(tenant, objectId);
@@ -297,7 +297,7 @@ export class StorageController {
   @Get("objects/:objectId/download-url")
   @RequiredOrgPermissions({ storage: ["read"] })
   async getPresignedDownloadUrl(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("objectId") objectId: string,
     @Query() query: unknown,
   ) {
@@ -319,7 +319,7 @@ export class StorageController {
   @Get("objects/:objectId/content")
   @RequiredOrgPermissions({ storage: ["read"] })
   async downloadDirect(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("objectId") objectId: string,
     @Query() query: unknown,
     @Res() reply: FastifyReply,
@@ -353,7 +353,7 @@ export class StorageController {
   @Patch("objects/:objectId")
   @RequiredOrgPermissions({ storage: ["upload"] })
   async updateObject(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("objectId") objectId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -377,7 +377,7 @@ export class StorageController {
   @Delete("objects/:objectId")
   @RequiredOrgPermissions({ storage: ["delete"] })
   async deleteObject(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("objectId") objectId: string,
     @Req() req: FastifyRequest,
   ) {

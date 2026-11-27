@@ -130,7 +130,7 @@ export class MpesaSettlementService {
           where: { id: organizationId },
           select: { id: true, name: true },
         }),
-        tx.tenantSettings.findUnique({
+        tx.organizationSettings.findUnique({
           where: { organizationId },
           select: { companyLegalName: true },
         }),

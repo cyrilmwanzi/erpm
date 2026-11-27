@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { CalendarFeedScope, StaffStatus, TimeOffStatus } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   computeDailyShiftMinutes,
   DEFAULT_WORKING_DAYS,
@@ -64,7 +64,7 @@ export class AvailabilityService {
   ) {}
 
   async queryAvailability(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: QueryAvailabilityInput,
   ) {
     const fromDate = normalizeUtcDate(input.from);
@@ -489,7 +489,7 @@ export class AvailabilityService {
   }
 
   async getCalendarEvents(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: QueryCalendarEventsInput,
   ) {
     const events = await this.getCalendarEventsForOrganization(

@@ -21,7 +21,7 @@ import {
   StockMovementType,
   StorageEntityType,
   SubAssemblyStrategy,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { PrismaService } from "../database/prisma.service.js";
@@ -39,7 +39,7 @@ import {
   AttachmentsService,
   STORED_OBJECT_SUMMARY_SELECT,
 } from "../storage/attachments.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { ProductionEngineeringService } from "./engineering.service.js";
 import {
   computeTimeLogCosts,
@@ -138,7 +138,7 @@ export class ProductionService {
   ) {}
 
   async createBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateProductionBatchInput,
     ipAddress?: string,
   ) {
@@ -191,7 +191,7 @@ export class ProductionService {
 
   private async createBatchTreeTx(
     tx: Prisma.TransactionClient,
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateProductionBatchInput & { batchNumber: string },
     visitedItems: Set<string>,
     ipAddress?: string,
@@ -593,7 +593,7 @@ export class ProductionService {
   }
 
   async releaseBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: ReleaseProductionBatchInput,
     ipAddress?: string,
@@ -685,7 +685,7 @@ export class ProductionService {
   }
 
   async listBatches(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListProductionBatchesQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -757,7 +757,7 @@ export class ProductionService {
     };
   }
 
-  async getBatch(tenant: AuthenticatedTenant, batchId: string) {
+  async getBatch(tenant: AuthenticatedOrganization, batchId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const batch = await this.prismaService.scoped.productionBatch.findFirst({
@@ -773,7 +773,7 @@ export class ProductionService {
   }
 
   async startBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     ipAddress?: string,
   ) {
@@ -849,7 +849,7 @@ export class ProductionService {
   }
 
   async suggestLotsForBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: Omit<SuggestLotsInput, "locationId"> & { locationId?: string },
   ) {
@@ -869,7 +869,7 @@ export class ProductionService {
   }
 
   async consumeMaterials(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: ConsumeMaterialsInput,
     ipAddress?: string,
@@ -979,7 +979,7 @@ export class ProductionService {
   }
 
   async completeBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     input: CompleteProductionBatchInput,
     ipAddress?: string,
@@ -1215,7 +1215,7 @@ export class ProductionService {
   }
 
   async cancelBatch(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     reason?: string,
     ipAddress?: string,
@@ -1295,7 +1295,7 @@ export class ProductionService {
     });
   }
 
-  async getBatchTraceability(tenant: AuthenticatedTenant, batchId: string) {
+  async getBatchTraceability(tenant: AuthenticatedOrganization, batchId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
 
     const batch = await this.prismaService.scoped.productionBatch.findFirst({
@@ -1450,7 +1450,7 @@ export class ProductionService {
     };
   }
 
-  async listBatchFiles(tenant: AuthenticatedTenant, batchId: string) {
+  async listBatchFiles(tenant: AuthenticatedOrganization, batchId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const batch = await this.prismaService.scoped.productionBatch.findFirst({
       where: { id: batchId, organizationId },
@@ -1472,7 +1472,7 @@ export class ProductionService {
   }
 
   async addBatchFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     req: FastifyRequest,
     body: unknown,
@@ -1494,7 +1494,7 @@ export class ProductionService {
   }
 
   async removeBatchFile(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     batchId: string,
     attachmentId: string,
     ipAddress?: string,
@@ -1645,10 +1645,10 @@ export class ProductionService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

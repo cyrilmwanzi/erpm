@@ -22,11 +22,11 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { attachStoredObjectSchema } from "../storage/attachments.service.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { DeliveriesService } from "./deliveries.service.js";
 
 const bulkQuantitySchema = z
@@ -178,7 +178,7 @@ const updateClaimSchema = z.object({
 });
 
 @Controller("api/v1/deliveries")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class DeliveriesController {
   constructor(
     @Inject(DeliveriesService)
@@ -188,7 +188,7 @@ export class DeliveriesController {
   @Get()
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async listDeliveries(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listDeliveriesQuerySchema.safeParse(query ?? {});
@@ -204,7 +204,7 @@ export class DeliveriesController {
   @Get("quarantine")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async listQuarantineHolds(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listQuarantineQuerySchema.safeParse(query ?? {});
@@ -220,7 +220,7 @@ export class DeliveriesController {
   @Post("quarantine/:holdId/resolve")
   @RequiredOrgPermissions({ purchaseOrder: ["accept"] })
   async resolveQuarantineHold(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("holdId") holdId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -243,7 +243,7 @@ export class DeliveriesController {
   @Get("claims")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async listSupplierClaims(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listClaimsQuerySchema.safeParse(query ?? {});
@@ -259,7 +259,7 @@ export class DeliveriesController {
   @Patch("claims/:claimId")
   @RequiredOrgPermissions({ purchaseOrder: ["update"] })
   async updateSupplierClaim(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("claimId") claimId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -282,7 +282,7 @@ export class DeliveriesController {
   @Get(":deliveryId")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async getDelivery(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
   ) {
     return this.deliveriesService.getDelivery(tenant, deliveryId);
@@ -291,7 +291,7 @@ export class DeliveriesController {
   @Post(":deliveryId/qc")
   @RequiredOrgPermissions({ purchaseOrder: ["qc"] })
   async submitQcInspection(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -314,7 +314,7 @@ export class DeliveriesController {
   @Post(":deliveryId/accept")
   @RequiredOrgPermissions({ purchaseOrder: ["accept"] })
   async acceptDelivery(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -337,7 +337,7 @@ export class DeliveriesController {
   @Get(":deliveryId/files")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async listDeliveryFiles(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
   ) {
     return this.deliveriesService.listFiles(tenant, deliveryId);
@@ -346,7 +346,7 @@ export class DeliveriesController {
   @Post(":deliveryId/files")
   @RequiredOrgPermissions({ purchaseOrder: ["receive"] })
   async addDeliveryFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Req() req: FastifyRequest,
     @Body() body: unknown,
@@ -362,7 +362,7 @@ export class DeliveriesController {
   @Post(":deliveryId/lines/:lineId/files")
   @RequiredOrgPermissions({ purchaseOrder: ["receive"] })
   async addDeliveryLineFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Param("lineId") lineId: string,
     @Req() req: FastifyRequest,
@@ -380,7 +380,7 @@ export class DeliveriesController {
   @Delete(":deliveryId/files/:attachmentId")
   @RequiredOrgPermissions({ purchaseOrder: ["update"] })
   async removeDeliveryFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Param("attachmentId") attachmentId: string,
     @Req() req: FastifyRequest,
@@ -396,7 +396,7 @@ export class DeliveriesController {
   @Post(":deliveryId/cancel")
   @RequiredOrgPermissions({ purchaseOrder: ["receive"] })
   async cancelDelivery(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("deliveryId") deliveryId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

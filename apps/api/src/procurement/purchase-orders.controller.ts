@@ -15,11 +15,11 @@ import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { attachStoredObjectSchema } from "../storage/attachments.service.js";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { DeliveriesService } from "./deliveries.service.js";
 import { PurchaseOrdersService } from "./purchase-orders.service.js";
 
@@ -160,7 +160,7 @@ const receiveGoodsSchema = z.object({
 });
 
 @Controller("api/v1/purchase-orders")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class PurchaseOrdersController {
   constructor(
     @Inject(PurchaseOrdersService)
@@ -172,7 +172,7 @@ export class PurchaseOrdersController {
   @Post()
   @RequiredOrgPermissions({ purchaseOrder: ["create"] })
   async createPurchaseOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -194,7 +194,7 @@ export class PurchaseOrdersController {
   @Get()
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async listPurchaseOrders(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listPoQuerySchema.safeParse(query ?? {});
@@ -211,7 +211,7 @@ export class PurchaseOrdersController {
   @Get(":poId")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async getPurchaseOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
   ) {
     return this.purchaseOrdersService.getPurchaseOrder(tenant, poId);
@@ -220,7 +220,7 @@ export class PurchaseOrdersController {
   @Patch(":poId")
   @RequiredOrgPermissions({ purchaseOrder: ["update"] })
   async updateDraftPurchaseOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -244,7 +244,7 @@ export class PurchaseOrdersController {
   @Post(":poId/submit")
   @RequiredOrgPermissions({ purchaseOrder: ["submit"] })
   async submitPurchaseOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -254,7 +254,7 @@ export class PurchaseOrdersController {
   @Post(":poId/cancel")
   @RequiredOrgPermissions({ purchaseOrder: ["cancel"] })
   async cancelPurchaseOrder(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -278,7 +278,7 @@ export class PurchaseOrdersController {
   @Get(":poId/delivery-preview")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async getDeliveryPreview(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
   ) {
     return this.deliveriesService.getDeliveryPreview(tenant, poId);
@@ -287,7 +287,7 @@ export class PurchaseOrdersController {
   @Get(":poId/deliveries")
   @RequiredOrgPermissions({ purchaseOrder: ["read"] })
   async listPoDeliveries(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
     @Query("limit") limit?: string,
     @Query("cursor") cursor?: string,
@@ -302,7 +302,7 @@ export class PurchaseOrdersController {
   @Post(":poId/deliveries")
   @RequiredOrgPermissions({ purchaseOrder: ["receive"] })
   async createDelivery(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -326,7 +326,7 @@ export class PurchaseOrdersController {
   @Post(":poId/receive")
   @RequiredOrgPermissions({ purchaseOrder: ["receive"] })
   async receiveGoods(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("poId") poId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

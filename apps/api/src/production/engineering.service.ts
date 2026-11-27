@@ -15,11 +15,11 @@ import {
   Prisma,
   RoutingStatus,
   SubAssemblyStrategy,
-  TenantContext,
+  OrganizationContext,
   WorkCenterStatus,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   computeTimeLogCosts,
   resolveItemStandardUnitCostCents,
@@ -215,7 +215,7 @@ export class ProductionEngineeringService {
   // ==========================================
 
   async createWorkCenter(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateWorkCenterInput,
     ipAddress?: string,
   ) {
@@ -289,7 +289,7 @@ export class ProductionEngineeringService {
   }
 
   async listWorkCenters(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListWorkCentersQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -328,7 +328,7 @@ export class ProductionEngineeringService {
     };
   }
 
-  async getWorkCenter(tenant: AuthenticatedTenant, workCenterId: string) {
+  async getWorkCenter(tenant: AuthenticatedOrganization, workCenterId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const wc = await this.prismaService.scoped.workCenter.findFirst({
       where: { id: workCenterId, organizationId },
@@ -343,7 +343,7 @@ export class ProductionEngineeringService {
   }
 
   async updateWorkCenter(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     workCenterId: string,
     input: UpdateWorkCenterInput,
     ipAddress?: string,
@@ -438,7 +438,7 @@ export class ProductionEngineeringService {
   // ==========================================
 
   async createBom(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateBomInput,
     ipAddress?: string,
   ) {
@@ -564,7 +564,7 @@ export class ProductionEngineeringService {
     }
   }
 
-  async listBoms(tenant: AuthenticatedTenant, query: ListBomsQuery) {
+  async listBoms(tenant: AuthenticatedOrganization, query: ListBomsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -613,7 +613,7 @@ export class ProductionEngineeringService {
     };
   }
 
-  async getBom(tenant: AuthenticatedTenant, bomId: string) {
+  async getBom(tenant: AuthenticatedOrganization, bomId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const bom = await this.prismaService.scoped.billOfMaterial.findFirst({
       where: { id: bomId, organizationId },
@@ -626,7 +626,7 @@ export class ProductionEngineeringService {
   }
 
   async updateBom(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     bomId: string,
     input: UpdateBomInput,
     ipAddress?: string,
@@ -737,7 +737,7 @@ export class ProductionEngineeringService {
   }
 
   async activateBom(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     bomId: string,
     makeDefault?: boolean,
     ipAddress?: string,
@@ -803,7 +803,7 @@ export class ProductionEngineeringService {
   }
 
   async cloneBomVersion(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     bomId: string,
     ipAddress?: string,
   ) {
@@ -884,7 +884,7 @@ export class ProductionEngineeringService {
   }
 
   async explodeBom(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     bomId: string,
     options: {
       quantity?: number;
@@ -1159,7 +1159,7 @@ export class ProductionEngineeringService {
   // ==========================================
 
   async createRouting(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateRoutingInput,
     ipAddress?: string,
   ) {
@@ -1247,7 +1247,7 @@ export class ProductionEngineeringService {
     }
   }
 
-  async listRoutings(tenant: AuthenticatedTenant, query: ListRoutingsQuery) {
+  async listRoutings(tenant: AuthenticatedOrganization, query: ListRoutingsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -1285,7 +1285,7 @@ export class ProductionEngineeringService {
     };
   }
 
-  async getRouting(tenant: AuthenticatedTenant, routingId: string) {
+  async getRouting(tenant: AuthenticatedOrganization, routingId: string) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const routing = await this.prismaService.scoped.routing.findFirst({
       where: { id: routingId, organizationId },
@@ -1298,7 +1298,7 @@ export class ProductionEngineeringService {
   }
 
   async updateRouting(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     routingId: string,
     input: UpdateRoutingInput,
     ipAddress?: string,
@@ -1390,7 +1390,7 @@ export class ProductionEngineeringService {
   }
 
   async activateRouting(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     routingId: string,
     makeDefault?: boolean,
     ipAddress?: string,
@@ -1659,10 +1659,10 @@ export class ProductionEngineeringService {
     } as const;
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

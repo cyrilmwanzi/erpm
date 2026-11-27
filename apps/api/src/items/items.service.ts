@@ -12,13 +12,13 @@ import {
   ItemVariantKind,
   LotAllocationStrategy,
   Prisma,
-  TenantContext,
+  OrganizationContext,
   type Item,
 } from "@scace/db";
 import { BillingEnforcementService } from "../billing/billing-enforcement.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 
 export interface CreateItemInput {
   sku: string;
@@ -162,7 +162,7 @@ export class ItemsService {
   ) {}
 
   async createItem(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateItemInput,
     ipAddress?: string,
   ) {
@@ -239,7 +239,7 @@ export class ItemsService {
       const result = await this.prismaService.raw.$transaction(async (tx) => {
         let resolvedCurrency = input.currency;
         if (!resolvedCurrency) {
-          const settings = await tx.tenantSettings.findUnique({
+          const settings = await tx.organizationSettings.findUnique({
             where: { organizationId },
             select: { defaultCurrency: true },
           });
@@ -347,7 +347,7 @@ export class ItemsService {
     }
   }
 
-  async listItems(tenant: AuthenticatedTenant, query: ListItemsQuery) {
+  async listItems(tenant: AuthenticatedOrganization, query: ListItemsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -405,7 +405,7 @@ export class ItemsService {
     };
   }
 
-  async getItem(tenant: AuthenticatedTenant, itemId: string): Promise<Item> {
+  async getItem(tenant: AuthenticatedOrganization, itemId: string): Promise<Item> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const cacheKey = this.itemCacheKey(organizationId, itemId);
 
@@ -436,7 +436,7 @@ export class ItemsService {
   }
 
   async updateItem(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     input: UpdateItemInput,
     ipAddress?: string,
@@ -802,7 +802,7 @@ export class ItemsService {
   }
 
   async archiveItem(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     reason?: string,
     ipAddress?: string,
@@ -893,7 +893,7 @@ export class ItemsService {
   }
 
   async restoreItem(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     targetStatus: "ACTIVE" | "DRAFT" = ItemStatus.ACTIVE,
     reason?: string,
@@ -990,7 +990,7 @@ export class ItemsService {
   }
 
   async listItemHistory(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     itemId: string,
     limit = 25,
     cursor?: string,
@@ -1034,16 +1034,16 @@ export class ItemsService {
     };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
 
   private itemCacheKey(organizationId: string, itemId: string): string {
-    return `tenant:${organizationId}:item:${itemId}`;
+    return `org:${organizationId}:item:${itemId}`;
   }
 
   private async invalidateItemCacheSafe(
@@ -1051,7 +1051,7 @@ export class ItemsService {
     itemId: string,
   ): Promise<void> {
     try {
-      await this.redisService.invalidateTenantCache(
+      await this.redisService.invalidateOrganizationCache(
         organizationId,
         `item:${itemId}`,
       );

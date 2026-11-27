@@ -732,7 +732,7 @@ function mapControllerMethodToNamespace(controllerName, fullPath, methodName) {
     RootController: ["system"],
     HealthController: ["health"],
     ObservabilityController: ["observability"],
-    TenantsController: ["tenants"],
+    OrganizationsController: ["organizations"],
     InvitationsController: ["invitations"],
     ItemsController: ["items"],
     VariantsController: ["variants"],
@@ -926,7 +926,7 @@ function main() {
       const classDecorators = (stmt.modifiers ?? []).filter(isDecorator);
 
       let controllerPrefix = null;
-      let classRequiresTenant = false;
+      let classRequiresOrganization = false;
       let classAllowAnonymous = false;
       let classOptionalAuth = false;
       let classPermissions = undefined;
@@ -936,8 +936,8 @@ function main() {
         if (!info) continue;
         if (info.name === "Controller") {
           controllerPrefix = getStringLiteralValue(info.args[0]) ?? "";
-        } else if (info.name === "RequireActiveTenant") {
-          classRequiresTenant = true;
+        } else if (info.name === "RequireActiveOrganization") {
+          classRequiresOrganization = true;
         } else if (info.name === "AllowAnonymous") {
           classAllowAnonymous = true;
         } else if (info.name === "OptionalAuth") {
@@ -956,7 +956,7 @@ function main() {
 
         let httpMethod = null;
         let methodRoutePath = "";
-        let methodRequiresTenant = classRequiresTenant;
+        let methodRequiresOrganization = classRequiresOrganization;
         let methodAllowAnonymous = classAllowAnonymous;
         let methodOptionalAuth = classOptionalAuth;
         let methodPermissions = classPermissions;
@@ -967,8 +967,8 @@ function main() {
           if (HTTP_METHOD_DECORATORS.has(info.name)) {
             httpMethod = HTTP_METHOD_DECORATORS.get(info.name);
             methodRoutePath = getStringLiteralValue(info.args[0]) ?? "";
-          } else if (info.name === "RequireActiveTenant") {
-            methodRequiresTenant = true;
+          } else if (info.name === "RequireActiveOrganization") {
+            methodRequiresOrganization = true;
           } else if (info.name === "AllowAnonymous") {
             methodAllowAnonymous = true;
           } else if (info.name === "OptionalAuth") {
@@ -1277,8 +1277,8 @@ function main() {
             ? "public"
             : methodOptionalAuth
               ? "optional"
-              : methodRequiresTenant
-                ? "tenant"
+              : methodRequiresOrganization
+                ? "organization"
                 : "authenticated",
           permissions: methodPermissions,
           pathParams,
@@ -1398,7 +1398,7 @@ function emitGeneratedSdk(endpoints) {
     `  methodName: string;`,
     `  httpMethod: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";`,
     `  path: string;`,
-    `  authMode: "public" | "optional" | "authenticated" | "tenant";`,
+    `  authMode: "public" | "optional" | "authenticated" | "organization";`,
     `  permissions?: Record<string, string[]>;`,
     `  controller: string;`,
     `  sourceFile: string;`,

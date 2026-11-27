@@ -15,11 +15,11 @@ import { LeaveType, TimeOffStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ScheduleLeaveService } from "./schedule-leave.service.js";
 
 const workingDaySchema = z.object({
@@ -118,7 +118,7 @@ const reviewTimeOffSchema = z.object({
 });
 
 @Controller("api/v1/schedules")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class SchedulesController {
   constructor(
     @Inject(ScheduleLeaveService)
@@ -128,7 +128,7 @@ export class SchedulesController {
   @Post()
   @RequiredOrgPermissions({ staff: ["update"] })
   async createSchedule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -145,7 +145,7 @@ export class SchedulesController {
   @Get()
   @RequiredOrgPermissions({ staff: ["read"] })
   async listSchedules(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listSchedulesQuerySchema.safeParse(query ?? {});
@@ -164,7 +164,7 @@ export class SchedulesController {
   @Patch(":scheduleId")
   @RequiredOrgPermissions({ staff: ["update"] })
   async updateSchedule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("scheduleId") scheduleId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -186,7 +186,7 @@ export class SchedulesController {
 }
 
 @Controller("api/v1/holidays")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class HolidaysController {
   constructor(
     @Inject(ScheduleLeaveService)
@@ -196,7 +196,7 @@ export class HolidaysController {
   @Post()
   @RequiredOrgPermissions({ calendar: ["manage"] })
   async createHoliday(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -213,7 +213,7 @@ export class HolidaysController {
   @Get()
   @RequiredOrgPermissions({ calendar: ["read"] })
   async listHolidays(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listHolidaysQuerySchema.safeParse(query ?? {});
@@ -229,7 +229,7 @@ export class HolidaysController {
   @Delete(":holidayId")
   @RequiredOrgPermissions({ calendar: ["manage"] })
   async deleteHoliday(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("holidayId") holidayId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -238,7 +238,7 @@ export class HolidaysController {
 }
 
 @Controller("api/v1/time-off")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class TimeOffController {
   constructor(
     @Inject(ScheduleLeaveService)
@@ -248,7 +248,7 @@ export class TimeOffController {
   @Post()
   @RequiredOrgPermissions({ timeOff: ["request"] })
   async requestTimeOff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -265,7 +265,7 @@ export class TimeOffController {
   @Get("mine")
   @RequiredOrgPermissions({ timeOff: ["read"] })
   async listMyTimeOff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listTimeOffQuerySchema.safeParse(query ?? {});
@@ -281,7 +281,7 @@ export class TimeOffController {
   @Get()
   @RequiredOrgPermissions({ timeOff: ["read"] })
   async listTimeOff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listTimeOffQuerySchema.safeParse(query ?? {});
@@ -297,7 +297,7 @@ export class TimeOffController {
   @Post(":requestId/approve")
   @RequiredOrgPermissions({ timeOff: ["approve"] })
   async approveTimeOff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("requestId") requestId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -321,7 +321,7 @@ export class TimeOffController {
   @Post(":requestId/reject")
   @RequiredOrgPermissions({ timeOff: ["approve"] })
   async rejectTimeOff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("requestId") requestId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -345,7 +345,7 @@ export class TimeOffController {
   @Post(":requestId/cancel")
   @RequiredOrgPermissions({ timeOff: ["request"] })
   async cancelTimeOff(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("requestId") requestId: string,
     @Req() req: FastifyRequest,
   ) {

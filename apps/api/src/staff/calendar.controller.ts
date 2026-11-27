@@ -16,11 +16,11 @@ import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { AvailabilityService } from "./availability.service.js";
 import { CalendarFeedService } from "./calendar-feed.service.js";
 
@@ -98,10 +98,10 @@ export class AvailabilityCalendarController {
   ) {}
 
   @Post("availability/query")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ staff: ["read"] })
   async queryAvailabilityPost(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = availabilityQueryBodySchema.safeParse(body);
@@ -115,10 +115,10 @@ export class AvailabilityCalendarController {
   }
 
   @Get("availability")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ staff: ["read"] })
   async queryAvailabilityGet(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = availabilityGetQuerySchema.safeParse(query ?? {});
@@ -140,10 +140,10 @@ export class AvailabilityCalendarController {
   }
 
   @Get("calendar/events")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ calendar: ["read"] })
   async getCalendarEvents(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = calendarEventsQuerySchema.safeParse(query ?? {});
@@ -157,10 +157,10 @@ export class AvailabilityCalendarController {
   }
 
   @Post("calendar/feeds")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ calendar: ["read"] })
   async createCalendarFeed(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -175,17 +175,17 @@ export class AvailabilityCalendarController {
   }
 
   @Get("calendar/feeds")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ calendar: ["read"] })
-  async listCalendarFeeds(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async listCalendarFeeds(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.calendarFeedService.listFeeds(tenant);
   }
 
   @Post("calendar/feeds/:feedId/rotate")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ calendar: ["read"] })
   async rotateCalendarFeed(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("feedId") feedId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -193,10 +193,10 @@ export class AvailabilityCalendarController {
   }
 
   @Delete("calendar/feeds/:feedId")
-  @RequireActiveTenant()
+  @RequireActiveOrganization()
   @RequiredOrgPermissions({ calendar: ["read"] })
   async revokeCalendarFeed(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("feedId") feedId: string,
     @Req() req: FastifyRequest,
   ) {

@@ -1,10 +1,10 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
-import { TenantContext } from "./tenant-context.js";
+import { OrganizationContext } from "./organization-context.js";
 
-export const TENANT_SCOPED_MODELS = new Set<string>([
-  "TenantSettings",
+export const ORGANIZATION_SCOPED_MODELS = new Set<string>([
+  "OrganizationSettings",
   "AuditLog",
   "Item",
   "ItemRevision",
@@ -346,21 +346,21 @@ function stripOrganizationOverride(
   return rest;
 }
 
-export function withTenantIsolation(
+export function withOrganizationIsolation(
   baseClient: PrismaClient,
   explicitOrganizationId?: string,
 ) {
   return baseClient.$extends({
-    name: "tenant-isolation",
+    name: "organization-isolation",
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          if (!model || !TENANT_SCOPED_MODELS.has(model)) {
+          if (!model || !ORGANIZATION_SCOPED_MODELS.has(model)) {
             return query(args);
           }
 
           const organizationId =
-            explicitOrganizationId ?? TenantContext.requireOrganizationId();
+            explicitOrganizationId ?? OrganizationContext.requireOrganizationId();
 
           const opArgs = (args ?? {}) as Record<string, unknown>;
           const delegate = (baseClient as unknown as Record<string, Record<string, (a: unknown) => Promise<unknown>>>)[
@@ -521,12 +521,13 @@ export function withTenantIsolation(
   });
 }
 
-export type TenantPrismaClient = ReturnType<typeof withTenantIsolation>;
+export type OrganizationPrismaClient = ReturnType<typeof withOrganizationIsolation>;
 
-export const tenantPrisma: TenantPrismaClient = withTenantIsolation(prisma);
+export const organizationPrisma: OrganizationPrismaClient =
+  withOrganizationIsolation(prisma);
 
-export function forTenant(organizationId: string): TenantPrismaClient {
-  return withTenantIsolation(prisma, organizationId);
+export function forOrganization(organizationId: string): OrganizationPrismaClient {
+  return withOrganizationIsolation(prisma, organizationId);
 }
 
 export async function disconnectPrisma(): Promise<void> {

@@ -18,7 +18,7 @@ import { getEnv } from "../config/env.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { RustfsService } from "./rustfs.service.js";
 import {
   buildContentDisposition,
@@ -123,12 +123,12 @@ export class StorageService {
       env.RUSTFS_BUCKET_PREFIX,
     );
 
-    let settings = await tx.tenantSettings.findFirst({
+    let settings = await tx.organizationSettings.findFirst({
       where: { organizationId },
     });
 
     if (!settings) {
-      settings = await tx.tenantSettings.create({
+      settings = await tx.organizationSettings.create({
         data: {
           organizationId,
           defaultCurrency: "USD",
@@ -139,7 +139,7 @@ export class StorageService {
         },
       });
     } else if (!settings.storageBucket) {
-      settings = await tx.tenantSettings.update({
+      settings = await tx.organizationSettings.update({
         where: { id: settings.id },
         data: { storageBucket: expectedBucket },
       });
@@ -166,13 +166,13 @@ export class StorageService {
       }
     }
 
-    // Lock tenant settings row during quota-sensitive transactions on PostgreSQL
+    // Lock organization settings row during quota-sensitive transactions on PostgreSQL
     await tx.$queryRaw`SELECT "id" FROM "tenant_settings" WHERE "organizationId" = ${organizationId} FOR UPDATE`;
 
     return { bucket, quotaBytes };
   }
 
-  private async verifySameTenantEntity(
+  private async verifySameOrganizationEntity(
     tx: Prisma.TransactionClient,
     organizationId: string,
     entityType: StorageEntityType,
@@ -332,7 +332,7 @@ export class StorageService {
     return { usedBytes, pendingBytes, objectCount };
   }
 
-  async getQuota(tenant: AuthenticatedTenant) {
+  async getQuota(tenant: AuthenticatedOrganization) {
     const result = await this.prismaService.raw.$transaction(async (tx) => {
       const { bucket, quotaBytes } = await this.ensureOrgStorageSettings(
         tx,
@@ -358,7 +358,7 @@ export class StorageService {
   }
 
   async updateQuota(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     quotaBytes: number,
     ipAddress?: string,
   ) {
@@ -375,15 +375,15 @@ export class StorageService {
       );
       await this.rustfsService.ensureBucket(bucket);
 
-      const settings = await tx.tenantSettings.findFirst({
+      const settings = await tx.organizationSettings.findFirst({
         where: { organizationId: tenant.organizationId },
       });
 
       if (!settings) {
-        throw new NotFoundException("Tenant settings not found.");
+        throw new NotFoundException("Organization settings not found.");
       }
 
-      const saved = await tx.tenantSettings.update({
+      const saved = await tx.organizationSettings.update({
         where: { id: settings.id },
         data: {
           storageQuotaBytes: BigInt(Math.floor(quotaBytes)),
@@ -395,7 +395,7 @@ export class StorageService {
           organizationId: tenant.organizationId,
           actorUserId: tenant.userId,
           action: "storage.quota.updated",
-          resourceType: "TenantSettings",
+          resourceType: "OrganizationSettings",
           resourceId: saved.id,
           metadata: {
             previousQuotaBytes: Number(settings.storageQuotaBytes),
@@ -422,7 +422,7 @@ export class StorageService {
     });
 
     try {
-      await this.redisService.invalidateTenantCache(
+      await this.redisService.invalidateOrganizationCache(
         tenant.organizationId,
         "settings",
       );
@@ -434,7 +434,7 @@ export class StorageService {
   }
 
   async createPresignedUpload(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreatePresignedUploadInput,
     ipAddress?: string,
   ) {
@@ -458,7 +458,7 @@ export class StorageService {
         tx,
         tenant.organizationId,
       );
-      const verifiedEntityId = await this.verifySameTenantEntity(
+      const verifiedEntityId = await this.verifySameOrganizationEntity(
         tx,
         tenant.organizationId,
         entityType,
@@ -535,7 +535,7 @@ export class StorageService {
   }
 
   async completeUpload(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     objectId: string,
     ipAddress?: string,
   ) {
@@ -633,7 +633,7 @@ export class StorageService {
   }
 
   async uploadDirect(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: DirectUploadInput,
     ipAddress?: string,
   ) {
@@ -659,7 +659,7 @@ export class StorageService {
         tx,
         tenant.organizationId,
       );
-      const verifiedEntityId = await this.verifySameTenantEntity(
+      const verifiedEntityId = await this.verifySameOrganizationEntity(
         tx,
         tenant.organizationId,
         entityType,
@@ -766,7 +766,7 @@ export class StorageService {
   }
 
   async listObjects(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListStoredObjectsQuery,
   ) {
     const take = Math.min(Math.max(query.limit ?? 25, 1), 100);
@@ -806,7 +806,7 @@ export class StorageService {
     };
   }
 
-  async getObjectMetadata(tenant: AuthenticatedTenant, objectId: string) {
+  async getObjectMetadata(tenant: AuthenticatedOrganization, objectId: string) {
     const record = await this.prismaService.scoped.storedObject.findFirst({
       where: {
         id: objectId,
@@ -823,7 +823,7 @@ export class StorageService {
   }
 
   async createPresignedDownloadUrl(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     objectId: string,
     disposition: "attachment" | "inline" = "attachment",
   ) {
@@ -866,7 +866,7 @@ export class StorageService {
   }
 
   async downloadDirect(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     objectId: string,
     disposition: "attachment" | "inline" = "attachment",
   ) {
@@ -908,7 +908,7 @@ export class StorageService {
   }
 
   async updateObject(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     objectId: string,
     input: UpdateStoredObjectInput,
     ipAddress?: string,
@@ -929,7 +929,7 @@ export class StorageService {
       const nextEntityType = input.entityType ?? existing.entityType;
       const nextEntityId =
         input.entityType !== undefined || input.entityId !== undefined
-          ? await this.verifySameTenantEntity(
+          ? await this.verifySameOrganizationEntity(
               tx,
               tenant.organizationId,
               nextEntityType,
@@ -972,7 +972,7 @@ export class StorageService {
   }
 
   async deleteObject(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     objectId: string,
     ipAddress?: string,
   ) {

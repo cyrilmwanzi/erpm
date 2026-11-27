@@ -23,7 +23,7 @@ import {
   Prisma,
   StaffJobStatus,
   StaffStatus,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import {
   hasOrganizationPermission,
@@ -34,7 +34,7 @@ import { AnalyticsService } from "../observability/analytics.service.js";
 import type { PrintableReceiptDocument } from "../orders/document-renderer.utils.js";
 import { OrdersService, type OrderLineInput } from "../orders/orders.service.js";
 import { PricingEngineService } from "../pricing/pricing-engine.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { FulfillmentNotificationsService } from "./fulfillment-notifications.service.js";
 import { StaffJobsService } from "./staff-jobs.service.js";
 
@@ -190,7 +190,7 @@ export class FulfillmentsService {
     private readonly analyticsService: AnalyticsService,
   ) {}
 
-  async getOrCreateSettings(tenant: AuthenticatedTenant) {
+  async getOrCreateSettings(tenant: AuthenticatedOrganization) {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
     const existing = await this.prismaService.scoped.fulfillmentSettings.findFirst({
       where: { organizationId },
@@ -207,7 +207,7 @@ export class FulfillmentsService {
   }
 
   async updateSettings(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: UpdateFulfillmentSettingsInput,
     ipAddress?: string,
   ) {
@@ -300,7 +300,7 @@ export class FulfillmentsService {
   }
 
   async createFulfillment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateFulfillmentInput,
     ipAddress?: string,
   ) {
@@ -341,7 +341,7 @@ export class FulfillmentsService {
       );
     }
 
-    const [location, customer, org, tenantSettings] = await Promise.all([
+    const [location, customer, org, organizationSettings] = await Promise.all([
       this.prismaService.raw.location.findFirst({
         where: { id: input.locationId, organizationId },
       }),
@@ -354,7 +354,7 @@ export class FulfillmentsService {
         where: { id: organizationId },
         select: { id: true, name: true },
       }),
-      this.prismaService.raw.tenantSettings.findUnique({
+      this.prismaService.raw.organizationSettings.findUnique({
         where: { organizationId },
         select: { companyLegalName: true, defaultCurrency: true },
       }),
@@ -381,7 +381,7 @@ export class FulfillmentsService {
     const quote = await this.pricingEngine.calculateQuote(tenant, {
       direction: PriceBookDirection.SALES,
       currency:
-        input.currency ?? customer?.currency ?? tenantSettings?.defaultCurrency,
+        input.currency ?? customer?.currency ?? organizationSettings?.defaultCurrency,
       priceBookId: input.priceBookId ?? null,
       customerSegment: customer?.customerSegment ?? null,
       externalAccountId:
@@ -526,7 +526,7 @@ export class FulfillmentsService {
             customer,
             orgName: org?.name ?? "Organization",
             companyLegalName:
-              tenantSettings?.companyLegalName ?? org?.name ?? "Organization",
+              organizationSettings?.companyLegalName ?? org?.name ?? "Organization",
             amountAppliedCents: cashPaymentCents,
             cashTenderedCents,
             notes: input.notes?.trim() || `Preorder/Order cash payment`,
@@ -614,7 +614,7 @@ export class FulfillmentsService {
   }
 
   private async attachFulfillmentToExistingOrder(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateFulfillmentInput,
     settings: { autoConvertPreordersToJobs: boolean },
     ipAddress?: string,
@@ -764,7 +764,7 @@ export class FulfillmentsService {
   }
 
   async confirmFulfillment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     ipAddress?: string,
   ) {
@@ -884,7 +884,7 @@ export class FulfillmentsService {
   }
 
   async updateFulfillment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     input: UpdateFulfillmentInput,
     ipAddress?: string,
@@ -1045,7 +1045,7 @@ export class FulfillmentsService {
   }
 
   async recordCashDepositPayment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     input: RecordFulfillmentCashPaymentInput,
     ipAddress?: string,
@@ -1058,7 +1058,7 @@ export class FulfillmentsService {
     }
 
     return this.prismaService.raw.$transaction(async (tx) => {
-      const [fulfillment, org, tenantSettings] = await Promise.all([
+      const [fulfillment, org, organizationSettings] = await Promise.all([
         tx.orderFulfillment.findFirst({
           where: { id: fulfillmentId, organizationId },
           include: {
@@ -1071,7 +1071,7 @@ export class FulfillmentsService {
           where: { id: organizationId },
           select: { id: true, name: true },
         }),
-        tx.tenantSettings.findUnique({
+        tx.organizationSettings.findUnique({
           where: { organizationId },
           select: { companyLegalName: true },
         }),
@@ -1149,7 +1149,7 @@ export class FulfillmentsService {
           customer: fulfillment.customer,
           orgName: org?.name ?? "Organization",
           companyLegalName:
-            tenantSettings?.companyLegalName ?? org?.name ?? "Organization",
+            organizationSettings?.companyLegalName ?? org?.name ?? "Organization",
           amountAppliedCents: input.amountCents,
           cashTenderedCents,
           reference: input.reference ?? null,
@@ -1186,7 +1186,7 @@ export class FulfillmentsService {
   }
 
   async updateNotificationPreferences(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     input: UpdateNotificationPreferencesInput,
     ipAddress?: string,
@@ -1241,7 +1241,7 @@ export class FulfillmentsService {
   }
 
   async transitionStatus(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     nextStatus: FulfillmentStatus,
     ipAddress?: string,
@@ -1396,7 +1396,7 @@ export class FulfillmentsService {
   }
 
   async confirmPickupHandoff(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     notes?: string | null,
     ipAddress?: string,
@@ -1498,7 +1498,7 @@ export class FulfillmentsService {
   }
 
   async markOutForDelivery(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     input: {
       courierStaffId?: string | null;
@@ -1621,7 +1621,7 @@ export class FulfillmentsService {
   }
 
   async markDelivered(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     notes?: string | null,
     ipAddress?: string,
@@ -1749,7 +1749,7 @@ export class FulfillmentsService {
   }
 
   async cancelFulfillment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     reason?: string,
     ipAddress?: string,
@@ -1837,7 +1837,7 @@ export class FulfillmentsService {
   }
 
   async listFulfillments(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListFulfillmentsQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -1927,7 +1927,7 @@ export class FulfillmentsService {
     };
   }
 
-  async getFulfillment(tenant: AuthenticatedTenant, fulfillmentId: string) {
+  async getFulfillment(tenant: AuthenticatedOrganization, fulfillmentId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const fulfillment =
       await this.prismaService.scoped.orderFulfillment.findUnique({
@@ -2168,10 +2168,10 @@ export class FulfillmentsService {
     return { payment, receipt };
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

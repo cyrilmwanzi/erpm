@@ -103,7 +103,7 @@ describe("M-Pesa Security & Daraja Utilities", () => {
   });
 });
 
-describe("M-Pesa Multi-Tenant Isolation, Callback Hardening & Settlement", () => {
+describe("M-Pesa Multi-Organization Isolation, Callback Hardening & Settlement", () => {
   function createInMemoryHarness() {
     const configs = new Map<string, any>();
     const txRecords = new Map<string, any>();
@@ -126,7 +126,7 @@ describe("M-Pesa Multi-Tenant Isolation, Callback Hardening & Settlement", () =>
           name: where.id === "org_a" ? "Org Alpha" : "Org Beta",
         }),
       },
-      tenantSettings: {
+      organizationSettings: {
         findUnique: async ({ where }: any) => ({
           organizationId: where.organizationId,
           companyLegalName: where.organizationId === "org_a" ? "Org Alpha Ltd" : "Org Beta Ltd",

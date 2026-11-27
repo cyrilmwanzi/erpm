@@ -21,12 +21,12 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ProductionEngineeringService } from "./engineering.service.js";
 
 const workCenterStatusEnum = z.enum([
@@ -202,7 +202,7 @@ const activateBodySchema = z.object({
 });
 
 @Controller("api/v1/production")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("production")
 export class ProductionEngineeringController {
   constructor(
@@ -217,7 +217,7 @@ export class ProductionEngineeringController {
   @Post("work-centers")
   @RequiredOrgPermissions({ production: ["create"] })
   async createWorkCenter(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -234,7 +234,7 @@ export class ProductionEngineeringController {
   @Get("work-centers")
   @RequiredOrgPermissions({ production: ["read"] })
   async listWorkCenters(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listWorkCentersQuerySchema.safeParse(query ?? {});
@@ -250,7 +250,7 @@ export class ProductionEngineeringController {
   @Get("work-centers/:workCenterId")
   @RequiredOrgPermissions({ production: ["read"] })
   async getWorkCenter(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("workCenterId") workCenterId: string,
   ) {
     return this.engineeringService.getWorkCenter(tenant, workCenterId);
@@ -259,7 +259,7 @@ export class ProductionEngineeringController {
   @Patch("work-centers/:workCenterId")
   @RequiredOrgPermissions({ production: ["update"] })
   async updateWorkCenter(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("workCenterId") workCenterId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -286,7 +286,7 @@ export class ProductionEngineeringController {
   @Post("boms")
   @RequiredOrgPermissions({ production: ["create"] })
   async createBom(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -303,7 +303,7 @@ export class ProductionEngineeringController {
   @Get("boms")
   @RequiredOrgPermissions({ production: ["read"] })
   async listBoms(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listBomsQuerySchema.safeParse(query ?? {});
@@ -319,7 +319,7 @@ export class ProductionEngineeringController {
   @Get("boms/:bomId")
   @RequiredOrgPermissions({ production: ["read"] })
   async getBom(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("bomId") bomId: string,
   ) {
     return this.engineeringService.getBom(tenant, bomId);
@@ -328,7 +328,7 @@ export class ProductionEngineeringController {
   @Patch("boms/:bomId")
   @RequiredOrgPermissions({ production: ["update"] })
   async updateBom(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("bomId") bomId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -346,7 +346,7 @@ export class ProductionEngineeringController {
   @Post("boms/:bomId/activate")
   @RequiredOrgPermissions({ production: ["update"] })
   async activateBom(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("bomId") bomId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -369,7 +369,7 @@ export class ProductionEngineeringController {
   @Post("boms/:bomId/clone-version")
   @RequiredOrgPermissions({ production: ["create"] })
   async cloneBomVersion(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("bomId") bomId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -379,7 +379,7 @@ export class ProductionEngineeringController {
   @Get("boms/:bomId/explode")
   @RequiredOrgPermissions({ production: ["read"] })
   async explodeBomGet(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("bomId") bomId: string,
     @Query() query: unknown,
   ) {
@@ -396,7 +396,7 @@ export class ProductionEngineeringController {
   @Post("boms/:bomId/explode")
   @RequiredOrgPermissions({ production: ["read"] })
   async explodeBomPost(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("bomId") bomId: string,
     @Body() body: unknown,
   ) {
@@ -417,7 +417,7 @@ export class ProductionEngineeringController {
   @Post("routings")
   @RequiredOrgPermissions({ production: ["create"] })
   async createRouting(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -434,7 +434,7 @@ export class ProductionEngineeringController {
   @Get("routings")
   @RequiredOrgPermissions({ production: ["read"] })
   async listRoutings(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listRoutingsQuerySchema.safeParse(query ?? {});
@@ -450,7 +450,7 @@ export class ProductionEngineeringController {
   @Get("routings/:routingId")
   @RequiredOrgPermissions({ production: ["read"] })
   async getRouting(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("routingId") routingId: string,
   ) {
     return this.engineeringService.getRouting(tenant, routingId);
@@ -459,7 +459,7 @@ export class ProductionEngineeringController {
   @Patch("routings/:routingId")
   @RequiredOrgPermissions({ production: ["update"] })
   async updateRouting(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("routingId") routingId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -482,7 +482,7 @@ export class ProductionEngineeringController {
   @Post("routings/:routingId/activate")
   @RequiredOrgPermissions({ production: ["update"] })
   async activateRouting(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("routingId") routingId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

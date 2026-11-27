@@ -8,6 +8,7 @@ WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/api/package.json ./apps/api/package.json
+COPY apps/docs/package.json ./apps/docs/package.json
 COPY packages/db/package.json ./packages/db/package.json
 COPY packages/sdk/package.json ./packages/sdk/package.json
 COPY packages/typescript-config/package.json ./packages/typescript-config/package.json

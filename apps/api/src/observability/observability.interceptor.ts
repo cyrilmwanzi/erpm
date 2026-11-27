@@ -8,11 +8,11 @@ import {
 import * as Sentry from "@sentry/nestjs";
 import type { FastifyReply } from "fastify";
 import { tap, type Observable } from "rxjs";
-import type { TenantScopedRequest } from "../tenancy/tenant.decorators.js";
+import type { OrganizationScopedRequest } from "../organizations/organization.decorators.js";
 import { AnalyticsService } from "./analytics.service.js";
 import { sanitizeRequestId, scrubUrlQuery } from "./scrubbing.utils.js";
 
-type EnrichedRequest = TenantScopedRequest & {
+type EnrichedRequest = OrganizationScopedRequest & {
   requestId?: string;
   routeOptions?: { url?: string };
 };
@@ -39,14 +39,14 @@ export class ObservabilityInterceptor implements NestInterceptor {
     request.requestId = requestId;
 
     const organizationId =
-      request.tenant?.organizationId ??
+      request.organization?.organizationId ??
       request.authContext?.organizationId ??
       request.session?.session?.activeOrganizationId ??
       null;
-    const userId = request.tenant?.userId ?? request.session?.user?.id ?? null;
-    const role = request.tenant?.role ?? null;
+    const userId = request.organization?.userId ?? request.session?.user?.id ?? null;
+    const role = request.organization?.role ?? null;
     const authMethod =
-      request.tenant?.authMethod ?? request.authContext?.authMethod ?? null;
+      request.organization?.authMethod ?? request.authContext?.authMethod ?? null;
     const principalType = request.authContext?.principalType ?? null;
     const routePattern =
       request.routeOptions?.url ??
@@ -86,11 +86,11 @@ export class ObservabilityInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        // Re-enrich after controller/TenantInterceptor in case TenantGuard populated tenant lazily
+        // Re-enrich after controller/OrganizationInterceptor in case OrganizationGuard populated organization lazily
         const resolvedOrgId =
-          request.tenant?.organizationId ?? organizationId ?? null;
-        const resolvedUserId = request.tenant?.userId ?? userId ?? null;
-        const resolvedRole = request.tenant?.role ?? role ?? null;
+          request.organization?.organizationId ?? organizationId ?? null;
+        const resolvedUserId = request.organization?.userId ?? userId ?? null;
+        const resolvedRole = request.organization?.role ?? role ?? null;
 
         if (resolvedOrgId) {
           isolationScope.setTag("organization_id", resolvedOrgId);

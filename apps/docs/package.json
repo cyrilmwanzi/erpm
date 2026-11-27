@@ -1,0 +1,41 @@
+{
+  "name": "@scace/docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:generate": "node scripts/generate-docs.mjs",
+    "predev": "node scripts/generate-docs.mjs",
+    "dev": "vite dev --port 3000 --host 0.0.0.0",
+    "prebuild": "node scripts/generate-docs.mjs",
+    "build": "vite build",
+    "prelint": "node scripts/generate-docs.mjs && (node -e \"import('node:fs').then(fs => { if (!fs.existsSync('src/routeTree.gen.ts')) process.exit(1); })\" || vite build)",
+    "lint": "tsc --noEmit",
+    "pretypecheck": "node scripts/generate-docs.mjs && (node -e \"import('node:fs').then(fs => { if (!fs.existsSync('src/routeTree.gen.ts')) process.exit(1); })\" || vite build)",
+    "typecheck": "tsc --noEmit",
+    "start": "node server.mjs",
+    "clean": "rm -rf dist .tanstack src/generated src/routeTree.gen.ts *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.170.46",
+    "@tanstack/react-start": "^1.169.7",
+    "lucide-react": "^1.82.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@scace/typescript-config": "workspace:*",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.4.0",
+    "vite-tsconfig-paths": "^6.1.1"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

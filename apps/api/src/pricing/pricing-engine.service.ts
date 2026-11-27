@@ -10,10 +10,10 @@ import {
   ItemVariantKind,
   PriceBookDirection,
   PricingModel,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import {
   applyCustomRuleAdjustment,
   calculateDiscountAmount,
@@ -143,16 +143,16 @@ export class PricingEngineService {
     @Inject(PrismaService) private readonly prismaService: PrismaService,
   ) {}
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
 
   async calculateQuote(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CalculateQuoteInput,
   ): Promise<CalculatedQuoteResult> {
     const organizationId = this.resolveVerifiedOrganizationId(tenant);
@@ -183,7 +183,7 @@ export class PricingEngineService {
     );
 
     const [settings, items, packs, servicePlans, discountRules] = await Promise.all([
-      this.prismaService.raw.tenantSettings.findUnique({
+      this.prismaService.raw.organizationSettings.findUnique({
         where: { organizationId },
         select: { defaultCurrency: true },
       }),

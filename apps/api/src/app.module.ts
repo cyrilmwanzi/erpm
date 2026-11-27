@@ -29,8 +29,8 @@ import { RedisModule } from "./redis/redis.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { StaffModule } from "./staff/staff.module.js";
 import { StorageModule } from "./storage/storage.module.js";
-import { TenancyModule } from "./tenancy/tenancy.module.js";
-import { TenantsModule } from "./tenants/tenants.module.js";
+import { OrganizationContextModule } from "./organizations/organization-context.module.js";
+import { OrganizationsModule } from "./organizations/organizations.module.js";
 import { VariantsModule } from "./variants/variants.module.js";
 
 @Module({
@@ -41,7 +41,7 @@ import { VariantsModule } from "./variants/variants.module.js";
     RedisModule,
     StorageModule,
     EmailModule,
-    TenancyModule,
+    OrganizationContextModule,
     BillingModule,
     AuthModule.forRoot({
       auth,
@@ -56,7 +56,7 @@ import { VariantsModule } from "./variants/variants.module.js";
     }),
     EnterpriseAuthModule,
     HealthModule,
-    TenantsModule,
+    OrganizationsModule,
     ItemsModule,
     VariantsModule,
     LocationsModule,

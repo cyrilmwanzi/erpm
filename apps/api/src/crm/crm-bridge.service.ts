@@ -14,7 +14,7 @@ import {
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { PricingEngineService } from "../pricing/pricing-engine.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { CrmConnectionService } from "./crm-connection.service.js";
 import { CustomerMatesClient } from "./customermates.client.js";
 
@@ -58,7 +58,7 @@ export class CrmBridgeService {
   ) {}
 
   async upsertStaffMapping(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: UpsertStaffMappingInput,
     ipAddress?: string,
   ) {
@@ -166,7 +166,7 @@ export class CrmBridgeService {
     });
   }
 
-  async listStaffMappings(tenant: AuthenticatedTenant) {
+  async listStaffMappings(tenant: AuthenticatedOrganization) {
     const items = await this.prismaService.scoped.crmStaffMapping.findMany({
       where: { organizationId: tenant.organizationId },
       orderBy: { createdAt: "desc" },
@@ -191,7 +191,7 @@ export class CrmBridgeService {
   }
 
   async deleteStaffMapping(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     staffId: string,
     ipAddress?: string,
   ) {
@@ -263,7 +263,7 @@ export class CrmBridgeService {
   }
 
   async linkItemToDeal(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     externalDealId: string,
     input: LinkDealItemInput,
     ipAddress?: string,
@@ -454,7 +454,7 @@ export class CrmBridgeService {
     });
   }
 
-  async listDealItems(tenant: AuthenticatedTenant, externalDealId: string) {
+  async listDealItems(tenant: AuthenticatedOrganization, externalDealId: string) {
     const links = await this.prismaService.scoped.crmDealItemLink.findMany({
       where: {
         organizationId: tenant.organizationId,
@@ -528,7 +528,7 @@ export class CrmBridgeService {
   }
 
   async unlinkItemFromDeal(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     externalDealId: string,
     itemId: string,
     ipAddress?: string,
@@ -564,7 +564,7 @@ export class CrmBridgeService {
   }
 
   async pushCatalogToCustomerMates(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: PushCatalogToCrmInput,
     ipAddress?: string,
   ) {

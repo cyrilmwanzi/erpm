@@ -19,12 +19,12 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredBillingFeature,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { ExpiryService } from "./expiry.service.js";
 
 const enforcementModeEnum = z.enum([
@@ -120,7 +120,7 @@ const extendExpirySchema = z.object({
 });
 
 @Controller("api/v1/inventory/expiry")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 @RequiredBillingFeature("expiry")
 export class ExpiryController {
   constructor(
@@ -129,14 +129,14 @@ export class ExpiryController {
 
   @Get("policy")
   @RequiredOrgPermissions({ inventory: ["read"] })
-  async getPolicy(@CurrentTenant() tenant: AuthenticatedTenant) {
+  async getPolicy(@CurrentOrganization() tenant: AuthenticatedOrganization) {
     return this.expiryService.getPolicy(tenant);
   }
 
   @Put("policy")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async updatePolicy(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -153,7 +153,7 @@ export class ExpiryController {
   @Get("summary")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async getSummary(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = summaryQuerySchema.safeParse(query ?? {});
@@ -169,7 +169,7 @@ export class ExpiryController {
   @Get("lots")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listLots(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listLotsQuerySchema.safeParse(query ?? {});
@@ -185,7 +185,7 @@ export class ExpiryController {
   @Post("scan")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async runScan(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Req() req: FastifyRequest,
   ) {
     return this.expiryService.runManualScan(tenant, req.ip);
@@ -194,7 +194,7 @@ export class ExpiryController {
   @Get("alerts")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listAlerts(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listAlertsQuerySchema.safeParse(query ?? {});
@@ -210,7 +210,7 @@ export class ExpiryController {
   @Post("alerts/:alertId/acknowledge")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async acknowledgeAlert(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("alertId") alertId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -233,7 +233,7 @@ export class ExpiryController {
   @Post("alerts/:alertId/resolve")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async resolveAlert(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("alertId") alertId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -256,7 +256,7 @@ export class ExpiryController {
   @Post("alerts/:alertId/dismiss")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async dismissAlert(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("alertId") alertId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -279,7 +279,7 @@ export class ExpiryController {
   @Post("lots/:lotId/quarantine")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async quarantineLot(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -297,7 +297,7 @@ export class ExpiryController {
   @Post("lots/:lotId/write-off")
   @RequiredOrgPermissions({ inventory: ["writeOff"] })
   async writeOffLot(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -315,7 +315,7 @@ export class ExpiryController {
   @Get("write-offs")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listWriteOffs(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listWriteOffsQuerySchema.safeParse(query ?? {});
@@ -331,7 +331,7 @@ export class ExpiryController {
   @Patch("lots/:lotId/extend-expiry")
   @RequiredOrgPermissions({ inventory: ["manageExpiry"] })
   async extendLotExpiry(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

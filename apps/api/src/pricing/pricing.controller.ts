@@ -23,11 +23,11 @@ import {
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { PricingCatalogService } from "./pricing-catalog.service.js";
 import { PricingEngineService } from "./pricing-engine.service.js";
 
@@ -238,7 +238,7 @@ const quoteSchema = z.object({
 });
 
 @Controller("api/v1/pricing")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class PricingController {
   constructor(
     @Inject(PricingCatalogService)
@@ -254,7 +254,7 @@ export class PricingController {
   @Post("quote")
   @RequiredOrgPermissions({ pricing: ["quote"] })
   async calculateQuote(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = quoteSchema.safeParse(body);
@@ -270,7 +270,7 @@ export class PricingController {
   @Post("simulate")
   @RequiredOrgPermissions({ pricing: ["quote"] })
   async simulateQuote(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     return this.calculateQuote(tenant, body);
@@ -283,7 +283,7 @@ export class PricingController {
   @Get("items/:itemId/options")
   @RequiredOrgPermissions({ pricing: ["read"] })
   async getItemPricingOptions(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
   ) {
     return this.catalogService.getItemPricingOptions(tenant, itemId);
@@ -292,7 +292,7 @@ export class PricingController {
   @Post("items/:itemId/packs")
   @RequiredOrgPermissions({ pricing: ["create"] })
   async createItemPack(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -310,7 +310,7 @@ export class PricingController {
   @Patch("packs/:packId")
   @RequiredOrgPermissions({ pricing: ["update"] })
   async updateItemPack(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("packId") packId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -328,7 +328,7 @@ export class PricingController {
   @Delete("packs/:packId")
   @RequiredOrgPermissions({ pricing: ["archive"] })
   async deleteItemPack(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("packId") packId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -338,7 +338,7 @@ export class PricingController {
   @Get("items/:itemId/bundle")
   @RequiredOrgPermissions({ pricing: ["read"] })
   async getBundleComponents(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
   ) {
     return this.catalogService.getBundleComponents(tenant, itemId);
@@ -347,7 +347,7 @@ export class PricingController {
   @Put("items/:itemId/bundle")
   @RequiredOrgPermissions({ pricing: ["update"] })
   async setBundleComponents(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -370,7 +370,7 @@ export class PricingController {
   @Post("items/:itemId/service-plans")
   @RequiredOrgPermissions({ pricing: ["create"] })
   async createServicePlan(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("itemId") itemId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -388,7 +388,7 @@ export class PricingController {
   @Patch("service-plans/:planId")
   @RequiredOrgPermissions({ pricing: ["update"] })
   async updateServicePlan(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("planId") planId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -410,7 +410,7 @@ export class PricingController {
   @Post("price-books")
   @RequiredOrgPermissions({ pricing: ["create"] })
   async createPriceBook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -427,7 +427,7 @@ export class PricingController {
   @Get("price-books")
   @RequiredOrgPermissions({ pricing: ["read"] })
   async listPriceBooks(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query("direction") direction?: PriceBookDirection,
     @Query("customerSegment") customerSegment?: string,
     @Query("externalAccountId") externalAccountId?: string,
@@ -446,7 +446,7 @@ export class PricingController {
   @Get("price-books/:priceBookId")
   @RequiredOrgPermissions({ pricing: ["read"] })
   async getPriceBook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("priceBookId") priceBookId: string,
   ) {
     return this.catalogService.getPriceBook(tenant, priceBookId);
@@ -455,7 +455,7 @@ export class PricingController {
   @Patch("price-books/:priceBookId")
   @RequiredOrgPermissions({ pricing: ["update"] })
   async updatePriceBook(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("priceBookId") priceBookId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -478,7 +478,7 @@ export class PricingController {
   @Post("price-books/:priceBookId/rules")
   @RequiredOrgPermissions({ pricing: ["create"] })
   async createPriceRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("priceBookId") priceBookId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -501,7 +501,7 @@ export class PricingController {
   @Patch("rules/:ruleId")
   @RequiredOrgPermissions({ pricing: ["update"] })
   async updatePriceRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("ruleId") ruleId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -519,7 +519,7 @@ export class PricingController {
   @Delete("rules/:ruleId")
   @RequiredOrgPermissions({ pricing: ["archive"] })
   async deletePriceRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("ruleId") ruleId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -533,7 +533,7 @@ export class PricingController {
   @Post("discounts")
   @RequiredOrgPermissions({ pricing: ["create"] })
   async createDiscountRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -550,7 +550,7 @@ export class PricingController {
   @Get("discounts")
   @RequiredOrgPermissions({ pricing: ["read"] })
   async listDiscountRules(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query("isActive") isActive?: string,
     @Query("promoCode") promoCode?: string,
     @Query("scope") scope?: DiscountScope,
@@ -565,7 +565,7 @@ export class PricingController {
   @Patch("discounts/:discountId")
   @RequiredOrgPermissions({ pricing: ["update"] })
   async updateDiscountRule(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("discountId") discountId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

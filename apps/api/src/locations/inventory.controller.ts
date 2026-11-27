@@ -14,11 +14,11 @@ import { ItemType, StockMovementType, StockTransferStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { InventoryService } from "./inventory.service.js";
 
 const listBalancesQuerySchema = z.object({
@@ -137,7 +137,7 @@ const cancelTransferSchema = z.object({
 });
 
 @Controller("api/v1/inventory")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class InventoryController {
   constructor(
     @Inject(InventoryService)
@@ -147,7 +147,7 @@ export class InventoryController {
   @Get("balances")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listBalances(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listBalancesQuerySchema.safeParse(query ?? {});
@@ -164,7 +164,7 @@ export class InventoryController {
   @Get("movements")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listMovements(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listMovementsQuerySchema.safeParse(query ?? {});
@@ -181,7 +181,7 @@ export class InventoryController {
   @Get("lots")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listLots(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listLotsQuerySchema.safeParse(query ?? {});
@@ -198,7 +198,7 @@ export class InventoryController {
   @Post("lots/suggest")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async suggestLots(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
   ) {
     const parsed = suggestLotsSchema.safeParse(body);
@@ -215,7 +215,7 @@ export class InventoryController {
   @Get("lots/:lotId/traceability")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async getLotTraceability(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
   ) {
     return this.inventoryService.getLotTraceability(tenant, lotId);
@@ -224,7 +224,7 @@ export class InventoryController {
   @Get("lots/:lotId/files")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listLotFiles(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
   ) {
     return this.inventoryService.listLotFiles(tenant, lotId);
@@ -233,7 +233,7 @@ export class InventoryController {
   @Post("lots/:lotId/files")
   @RequiredOrgPermissions({ inventory: ["adjust"] })
   async addLotFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
     @Req() req: FastifyRequest,
     @Body() body: unknown,
@@ -244,7 +244,7 @@ export class InventoryController {
   @Delete("lots/:lotId/files/:attachmentId")
   @RequiredOrgPermissions({ inventory: ["adjust"] })
   async removeLotFile(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("lotId") lotId: string,
     @Param("attachmentId") attachmentId: string,
     @Req() req: FastifyRequest,
@@ -260,7 +260,7 @@ export class InventoryController {
   @Post("adjustments")
   @RequiredOrgPermissions({ inventory: ["adjust"] })
   async adjustStock(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -278,7 +278,7 @@ export class InventoryController {
   @Get("transfers")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async listTransfers(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listTransfersQuerySchema.safeParse(query ?? {});
@@ -295,7 +295,7 @@ export class InventoryController {
   @Post("transfers")
   @RequiredOrgPermissions({ inventory: ["transfer"] })
   async createTransfer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -313,7 +313,7 @@ export class InventoryController {
   @Get("transfers/:transferId")
   @RequiredOrgPermissions({ inventory: ["read"] })
   async getTransfer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transferId") transferId: string,
   ) {
     return this.inventoryService.getTransfer(tenant, transferId);
@@ -322,7 +322,7 @@ export class InventoryController {
   @Post("transfers/:transferId/dispatch")
   @RequiredOrgPermissions({ inventory: ["transfer"] })
   async dispatchTransfer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transferId") transferId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -332,7 +332,7 @@ export class InventoryController {
   @Post("transfers/:transferId/receive")
   @RequiredOrgPermissions({ inventory: ["transfer"] })
   async receiveTransfer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transferId") transferId: string,
     @Req() req: FastifyRequest,
   ) {
@@ -342,7 +342,7 @@ export class InventoryController {
   @Post("transfers/:transferId/cancel")
   @RequiredOrgPermissions({ inventory: ["transfer"] })
   async cancelTransfer(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("transferId") transferId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

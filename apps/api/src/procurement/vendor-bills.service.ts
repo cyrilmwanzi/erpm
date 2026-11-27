@@ -9,12 +9,12 @@ import {
   GoodsReceiptStatus,
   Prisma,
   SupplierStatus,
-  TenantContext,
+  OrganizationContext,
   VendorBillStatus,
 } from "@scace/db";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { computeBaseUnitValueCents } from "./delivery-units.utils.js";
 
 export interface CreateVendorBillInput {
@@ -74,7 +74,7 @@ export class VendorBillsService {
   ) {}
 
   async createVendorBill(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateVendorBillInput,
     ipAddress?: string,
   ) {
@@ -406,7 +406,7 @@ export class VendorBillsService {
   }
 
   async createVendorBillFromDelivery(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     deliveryId: string,
     input: CreateVendorBillFromDeliveryInput,
     ipAddress?: string,
@@ -561,7 +561,7 @@ export class VendorBillsService {
   }
 
   async listVendorBills(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     query: ListVendorBillsQuery,
   ) {
     this.resolveVerifiedOrganizationId(tenant);
@@ -601,7 +601,7 @@ export class VendorBillsService {
     };
   }
 
-  async getVendorBill(tenant: AuthenticatedTenant, billId: string) {
+  async getVendorBill(tenant: AuthenticatedOrganization, billId: string) {
     this.resolveVerifiedOrganizationId(tenant);
 
     const bill = await this.prismaService.scoped.vendorBill.findUnique({
@@ -629,7 +629,7 @@ export class VendorBillsService {
   }
 
   async postVendorBill(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     billId: string,
     ipAddress?: string,
   ) {
@@ -701,7 +701,7 @@ export class VendorBillsService {
   }
 
   async recordPayment(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     billId: string,
     amountCents: number,
     reference?: string,
@@ -810,7 +810,7 @@ export class VendorBillsService {
   }
 
   async voidVendorBill(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     billId: string,
     reason?: string,
     ipAddress?: string,
@@ -878,10 +878,10 @@ export class VendorBillsService {
     });
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }

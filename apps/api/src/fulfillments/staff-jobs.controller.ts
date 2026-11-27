@@ -14,11 +14,11 @@ import { StaffJobStatus } from "@scace/db";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  CurrentTenant,
-  RequireActiveTenant,
+  CurrentOrganization,
+  RequireActiveOrganization,
   RequiredOrgPermissions,
-  type AuthenticatedTenant,
-} from "../tenancy/tenant.decorators.js";
+  type AuthenticatedOrganization,
+} from "../organizations/organization.decorators.js";
 import { StaffJobsService } from "./staff-jobs.service.js";
 
 const dateStringSchema = z
@@ -84,7 +84,7 @@ const listStaffJobsQuerySchema = z.object({
 });
 
 @Controller("api/v1/staff-jobs")
-@RequireActiveTenant()
+@RequireActiveOrganization()
 export class StaffJobsController {
   constructor(
     @Inject(StaffJobsService)
@@ -94,7 +94,7 @@ export class StaffJobsController {
   @Post()
   @RequiredOrgPermissions({ staffJob: ["create"] })
   async createStaffJob(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
@@ -111,7 +111,7 @@ export class StaffJobsController {
   @Get()
   @RequiredOrgPermissions({ staffJob: ["read"] })
   async listStaffJobs(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Query() query: unknown,
   ) {
     const parsed = listStaffJobsQuerySchema.safeParse(query ?? {});
@@ -127,7 +127,7 @@ export class StaffJobsController {
   @Get(":jobId")
   @RequiredOrgPermissions({ staffJob: ["read"] })
   async getStaffJob(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("jobId") jobId: string,
   ) {
     return this.staffJobsService.getStaffJob(tenant, jobId);
@@ -136,7 +136,7 @@ export class StaffJobsController {
   @Patch(":jobId/assign")
   @RequiredOrgPermissions({ staffJob: ["assign"] })
   async assignStaffJob(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("jobId") jobId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,
@@ -159,7 +159,7 @@ export class StaffJobsController {
   @Patch(":jobId/status")
   @RequiredOrgPermissions({ staffJob: ["update"] })
   async updateStaffJobStatus(
-    @CurrentTenant() tenant: AuthenticatedTenant,
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
     @Param("jobId") jobId: string,
     @Body() body: unknown,
     @Req() req: FastifyRequest,

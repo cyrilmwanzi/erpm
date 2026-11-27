@@ -1,9 +1,9 @@
 import { Injectable, OnModuleDestroy } from "@nestjs/common";
 import {
   disconnectPrisma,
-  forTenant,
+  forOrganization,
+  organizationPrisma,
   prisma,
-  tenantPrisma,
 } from "@scace/db";
 
 @Injectable()
@@ -15,16 +15,16 @@ export class PrismaService implements OnModuleDestroy {
   public readonly raw = prisma;
 
   /**
-   * Context-aware tenant-isolated Prisma client. Automatically scopes
-   * queries and mutations on tenant models using TenantContext.
+   * Context-aware organization-isolated Prisma client. Automatically scopes
+   * queries and mutations on organization-scoped models using OrganizationContext.
    */
-  public readonly scoped = tenantPrisma;
+  public readonly scoped = organizationPrisma;
 
   /**
    * Returns a Prisma client explicitly locked to a specific organizationId.
    */
-  forTenant(organizationId: string) {
-    return forTenant(organizationId);
+  forOrganization(organizationId: string) {
+    return forOrganization(organizationId);
   }
 
   async ping(): Promise<boolean> {

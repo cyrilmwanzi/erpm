@@ -13,7 +13,7 @@ import {
   Prisma,
   StaffJobStatus,
   StaffStatus,
-  TenantContext,
+  OrganizationContext,
 } from "@scace/db";
 import {
   hasOrganizationPermission,
@@ -23,7 +23,7 @@ import { CrmBridgeService } from "../crm/crm-bridge.service.js";
 import { CrmConnectionService } from "../crm/crm-connection.service.js";
 import { CustomerMatesClient } from "../crm/customermates.client.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AuthenticatedTenant } from "../tenancy/tenant.decorators.js";
+import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
 import { FulfillmentNotificationsService } from "./fulfillment-notifications.service.js";
 
 export interface ConvertFulfillmentToJobInput {
@@ -105,7 +105,7 @@ export class StaffJobsService {
   ) {}
 
   async convertFulfillmentToJob(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     fulfillmentId: string,
     input: ConvertFulfillmentToJobInput,
     ipAddress?: string,
@@ -204,7 +204,7 @@ export class StaffJobsService {
   }
 
   async createStaffJob(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     input: CreateStaffJobInput,
     ipAddress?: string,
   ) {
@@ -295,7 +295,7 @@ export class StaffJobsService {
     return created;
   }
 
-  async listStaffJobs(tenant: AuthenticatedTenant, query: ListStaffJobsQuery) {
+  async listStaffJobs(tenant: AuthenticatedOrganization, query: ListStaffJobsQuery) {
     this.resolveVerifiedOrganizationId(tenant);
     const take = Math.min(Math.max(query.limit, 1), 100);
     const search = query.search?.trim();
@@ -344,7 +344,7 @@ export class StaffJobsService {
     };
   }
 
-  async getStaffJob(tenant: AuthenticatedTenant, jobId: string) {
+  async getStaffJob(tenant: AuthenticatedOrganization, jobId: string) {
     this.resolveVerifiedOrganizationId(tenant);
     const job = await this.prismaService.scoped.staffJob.findUnique({
       where: { id: jobId },
@@ -357,7 +357,7 @@ export class StaffJobsService {
   }
 
   async assignStaffJob(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     jobId: string,
     input: AssignStaffJobInput,
     ipAddress?: string,
@@ -443,7 +443,7 @@ export class StaffJobsService {
   }
 
   async updateStaffJobStatus(
-    tenant: AuthenticatedTenant,
+    tenant: AuthenticatedOrganization,
     jobId: string,
     input: UpdateStaffJobStatusInput,
     ipAddress?: string,
@@ -831,10 +831,10 @@ export class StaffJobsService {
     } satisfies Prisma.StaffJobInclude;
   }
 
-  private resolveVerifiedOrganizationId(tenant: AuthenticatedTenant): string {
-    const contextOrgId = TenantContext.getOrganizationId();
+  private resolveVerifiedOrganizationId(tenant: AuthenticatedOrganization): string {
+    const contextOrgId = OrganizationContext.getOrganizationId();
     if (contextOrgId && contextOrgId !== tenant.organizationId) {
-      throw new BadRequestException("Active tenant context mismatch.");
+      throw new BadRequestException("Active organization context mismatch.");
     }
     return tenant.organizationId;
   }
