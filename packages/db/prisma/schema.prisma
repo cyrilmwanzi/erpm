@@ -135,6 +135,8 @@ model Organization {
   stockLots             StockLot[]
   quarantineHolds       QuarantineHold[]
   supplierClaims        SupplierClaim[]
+  customerPurchaseOrders     CustomerPurchaseOrder[]
+  customerPurchaseOrderLines CustomerPurchaseOrderLine[]
   customers             Customer[]
   orders                Order[]
   orderLines            OrderLine[]
@@ -357,6 +359,7 @@ model Item {
   stockLots          StockLot[]
   quarantineHolds    QuarantineHold[]
   supplierClaims     SupplierClaim[]
+  customerPurchaseOrderLines  CustomerPurchaseOrderLine[]
   orderLines                  OrderLine[]
   salesInvoiceLines           SalesInvoiceLine[]
   billsOfMaterialAsFinished   BillOfMaterial[]                @relation("FinishedItemBoms")
@@ -1815,6 +1818,16 @@ enum CustomerStatus {
   ARCHIVED
 }
 
+enum CustomerPoStatus {
+  RECEIVED
+  CONFIRMED
+  PARTIALLY_INVOICED
+  INVOICED
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
 enum OrderChannel {
   POS
   B2B
@@ -1862,6 +1875,8 @@ model Customer {
   customerSegment      String?
   currency             String            @default("USD")
   paymentTermsDays     Int               @default(0)
+  creditLimitCents     Int?
+  creditHold           Boolean           @default(false)
   billingAddressLine1  String?
   billingAddressLine2  String?
   billingCity          String?
@@ -1889,6 +1904,7 @@ model Customer {
   updatedAt            DateTime          @updatedAt
   orders               Order[]
   invoices             SalesInvoice[]
+  customerPurchaseOrders CustomerPurchaseOrder[]
   payments             CustomerPayment[]
   paymentTransactions  PaymentTransaction[]
   receipts             PaymentReceipt[]
@@ -1903,6 +1919,78 @@ model Customer {
   @@map("customer")
 }
 
+model CustomerPurchaseOrder {
+  id                  String             @id @default(cuid())
+  organizationId      String
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  internalRef         String
+  poNumber            String
+  customerId          String
+  customer            Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  status              CustomerPoStatus   @default(RECEIVED)
+  currency            String             @default("USD")
+  paymentTermsDays    Int                @default(30)
+  subtotalCents       Int                @default(0)
+  discountTotalCents  Int                @default(0)
+  taxCents            Int                @default(0)
+  totalCents          Int                @default(0)
+  invoicedAmountCents Int                @default(0)
+  issueDate           DateTime           @default(now())
+  effectiveDate       DateTime?
+  expiryDate          DateTime?
+  billingAddress      Json?
+  shippingAddress     Json?
+  notes               String?
+  documentUrl         String?
+  storageKey          String?
+  metadata            Json?
+  confirmedAt         DateTime?
+  confirmedByUserId   String?
+  cancelledAt         DateTime?
+  cancelledByUserId   String?
+  cancelReason        String?
+  createdByUserId     String?
+  updatedByUserId     String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  lines               CustomerPurchaseOrderLine[]
+  orders              Order[]
+  invoices            SalesInvoice[]
+
+  @@unique([organizationId, internalRef])
+  @@index([organizationId, customerId])
+  @@index([organizationId, poNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@map("customer_purchase_order")
+}
+
+model CustomerPurchaseOrderLine {
+  id                      String                @id @default(cuid())
+  organizationId          String
+  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerPurchaseOrderId String
+  customerPurchaseOrder   CustomerPurchaseOrder @relation(fields: [customerPurchaseOrderId], references: [id], onDelete: Cascade)
+  itemId                  String?
+  item                    Item?                 @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  sku                     String?
+  name                    String
+  description             String?
+  unitOfMeasure           String                @default("unit")
+  quantity                Int
+  invoicedQuantity        Int                   @default(0)
+  unitPriceCents          Int
+  discountCents           Int                   @default(0)
+  lineTotalCents          Int
+  notes                   String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  @@index([organizationId, customerPurchaseOrderId])
+  @@index([organizationId, itemId])
+  @@map("customer_purchase_order_line")
+}
+
 model Order {
   id                 String            @id @default(cuid())
   organizationId     String
@@ -1914,6 +2002,9 @@ model Order {
   location           Location          @relation(fields: [locationId], references: [id], onDelete: Restrict)
   customerId         String?
   customer           Customer?         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerPurchaseOrderId String?
+  customerPurchaseOrder   CustomerPurchaseOrder? @relation(fields: [customerPurchaseOrderId], references: [id], onDelete: SetNull)
+  customerPoNumber   String?
   priceBookId        String?
   priceBook          PriceBook?        @relation(fields: [priceBookId], references: [id], onDelete: SetNull)
   externalDealId     String?
@@ -1950,6 +2041,7 @@ model Order {
   @@unique([organizationId, orderNumber])
   @@index([organizationId, channel, status])
   @@index([organizationId, customerId])
+  @@index([organizationId, customerPurchaseOrderId])
   @@index([organizationId, locationId])
   @@index([organizationId, createdAt])
   @@map("sales_order")
@@ -1996,12 +2088,16 @@ model SalesInvoice {
   organizationId       String
   organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   invoiceNumber        String
-  orderId              String
-  order                Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId              String?
+  order                Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  customerPurchaseOrderId String?
+  customerPurchaseOrder   CustomerPurchaseOrder? @relation(fields: [customerPurchaseOrderId], references: [id], onDelete: SetNull)
+  customerPoNumber     String?
   customerId           String?
   customer             Customer?          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   status               SalesInvoiceStatus @default(DRAFT)
   currency             String             @default("USD")
+  paymentTermsDays     Int                @default(0)
   subtotalCents        Int                @default(0)
   discountTotalCents   Int                @default(0)
   taxCents             Int                @default(0)
@@ -2027,6 +2123,7 @@ model SalesInvoice {
   @@unique([organizationId, invoiceNumber])
   @@index([organizationId, status, dueAt])
   @@index([organizationId, orderId])
+  @@index([organizationId, customerPurchaseOrderId])
   @@index([organizationId, customerId])
   @@map("sales_invoice")
 }
@@ -2059,8 +2156,8 @@ model CustomerPayment {
   organizationId     String
   organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   paymentNumber      String
-  orderId            String
-  order              Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId            String?
+  order              Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
   salesInvoiceId     String?
   salesInvoice       SalesInvoice?         @relation(fields: [salesInvoiceId], references: [id], onDelete: Restrict)
   customerId         String?
@@ -2096,13 +2193,13 @@ model PaymentReceipt {
   receiptNumber     String
   paymentId         String          @unique
   payment           CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  orderId           String
-  order             Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId           String?
+  order             Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
   salesInvoiceId    String?
   salesInvoice      SalesInvoice?   @relation(fields: [salesInvoiceId], references: [id], onDelete: SetNull)
   customerId        String?
   customer          Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  channel           OrderChannel
+  channel           OrderChannel    @default(B2B)
   currency          String          @default("USD")
   totalCents        Int
   cashTenderedCents Int
@@ -3467,6 +3564,9 @@ enum CommunicationEventType {
   STOCK_EXPIRY_WRITEOFF
   SCHEDULED_REPORT_READY
   ON_DEMAND_REPORT_DISPATCH
+  INVOICE_ISSUED
+  INVOICE_PAYMENT_RECEIVED
+  CUSTOMER_PO_CONFIRMED
 }
 
 enum AlertSeverity {

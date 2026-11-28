@@ -27,7 +27,11 @@ import {
   verifyJwtSignature,
   verifyPkceS256,
 } from "./crypto.utils.js";
-import { isValidOAuthScope, normalizeScopesInput } from "./permissions.js";
+import {
+  ALL_SUPPORTED_OAUTH_SCOPES,
+  isValidOAuthScope,
+  normalizeScopesInput,
+} from "./permissions.js";
 
 export interface VerifiedOAuthAccessToken {
   jti: string;
@@ -231,8 +235,68 @@ export class OAuthProviderService {
       ],
       token_endpoint_auth_signing_alg_values_supported: ["ES256", "RS256", "EdDSA"],
       code_challenge_methods_supported: ["S256"],
-      scopes_supported: ["openid", "profile", "email", "offline_access"],
+      authorization_response_iss_parameter_supported: true,
+      resource_indicators_supported: true,
+      scopes_supported: [...ALL_SUPPORTED_OAUTH_SCOPES],
     };
+  }
+
+  getProtectedResourceMetadata(resourcePath?: string) {
+    const env = getEnv();
+    const issuer = env.OAUTH_ISSUER_URL;
+    const trimmedPath = resourcePath?.replace(/^\/+|\/+$/g, "") ?? "";
+    if (
+      trimmedPath &&
+      (trimmedPath.includes("..") || !/^[a-zA-Z0-9._/-]+$/.test(trimmedPath))
+    ) {
+      throw new BadRequestException("Invalid protected resource metadata path.");
+    }
+    const resource = trimmedPath ? `${issuer}/${trimmedPath}` : issuer;
+    return {
+      resource,
+      authorization_servers: [issuer],
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+      scopes_supported: [...ALL_SUPPORTED_OAUTH_SCOPES],
+      bearer_methods_supported: ["header"],
+      resource_name: "Scace ERP API",
+    };
+  }
+
+  private validateResourceIndicator(rawResource: unknown): string | undefined {
+    if (rawResource === undefined || rawResource === null || rawResource === "") {
+      return undefined;
+    }
+    if (typeof rawResource !== "string") {
+      this.oauthError("invalid_target", "resource parameter must be a valid URI string.");
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(rawResource.trim());
+    } catch {
+      this.oauthError("invalid_target", "resource parameter must be a valid absolute URI.");
+    }
+    if (parsed.hash) {
+      this.oauthError("invalid_target", "resource parameter must not include a fragment.");
+    }
+    const env = getEnv();
+    const allowedOrigins = new Set<string>();
+    try {
+      allowedOrigins.add(new URL(env.OAUTH_ISSUER_URL).origin);
+    } catch {
+      // ignore
+    }
+    try {
+      allowedOrigins.add(new URL(env.APP_URL).origin);
+    } catch {
+      // ignore
+    }
+    if (!allowedOrigins.has(parsed.origin)) {
+      this.oauthError(
+        "invalid_target",
+        "Requested resource indicator does not match this API server.",
+      );
+    }
+    return parsed.toString().replace(/\/+$/, "");
   }
 
   private async markJtiUsed(jti: string, ttlSeconds: number): Promise<boolean> {
@@ -537,6 +601,7 @@ export class OAuthProviderService {
     userEmail?: string | null;
     userName?: string | null;
     scopes: string[];
+    resource?: string;
     registeredDeviceId?: string | null;
     existingFamilyId?: string;
     issueRefreshToken: boolean;
@@ -546,11 +611,15 @@ export class OAuthProviderService {
     const nowSec = Math.floor(Date.now() / 1000);
     const accessTtl = params.client.accessTokenTtlSeconds || env.OAUTH_ACCESS_TOKEN_TTL_SECONDS;
     const jti = `scace_at_${generateRandomToken(18)}`;
+    const audience =
+      params.resource && params.resource !== env.OAUTH_ISSUER_URL
+        ? [env.OAUTH_ISSUER_URL, params.resource]
+        : env.OAUTH_ISSUER_URL;
 
     const accessPayload: Record<string, unknown> = {
       iss: env.OAUTH_ISSUER_URL,
       sub: params.sub,
-      aud: env.OAUTH_ISSUER_URL,
+      aud: audience,
       iat: nowSec,
       exp: nowSec + accessTtl,
       jti,
@@ -637,6 +706,7 @@ export class OAuthProviderService {
       redirectUri: string;
       scope?: string;
       state?: string;
+      resource?: string;
       codeChallenge: string;
       codeChallengeMethod: "S256";
       nonce?: string;
@@ -649,6 +719,8 @@ export class OAuthProviderService {
     if (tenant.isServicePrincipal) {
       throw new ForbiddenException("Service principals cannot authorize interactive PKCE flows.");
     }
+
+    this.validateResourceIndicator(input.resource);
 
     const client = await this.prismaService.raw.oAuthClient.findUnique({
       where: { clientId: input.clientId },
@@ -688,11 +760,13 @@ export class OAuthProviderService {
       },
     });
 
+    const env = getEnv();
     const redirectUrl = new URL(input.redirectUri);
     redirectUrl.searchParams.set("code", rawCode);
     if (input.state) {
       redirectUrl.searchParams.set("state", input.state);
     }
+    redirectUrl.searchParams.set("iss", env.OAUTH_ISSUER_URL);
 
     await this.recordAudit({
       organizationId: tenant.organizationId,
@@ -710,6 +784,7 @@ export class OAuthProviderService {
     return {
       code: rawCode,
       state: input.state ?? null,
+      iss: env.OAUTH_ISSUER_URL,
       scopes,
       redirectTo: redirectUrl.toString(),
       expiresIn: 300,
@@ -971,6 +1046,8 @@ export class OAuthProviderService {
       );
     }
 
+    const validatedResource = this.validateResourceIndicator(body.resource);
+
     if (grantType === "client_credentials") {
       if (authMethod === "none") {
         this.oauthError(
@@ -988,6 +1065,7 @@ export class OAuthProviderService {
         sub: `service:${client.clientId}`,
         principalType: "SERVICE_PRINCIPAL",
         scopes,
+        resource: validatedResource,
         issueRefreshToken: false,
       });
 
@@ -1024,7 +1102,7 @@ export class OAuthProviderService {
       if (
         !authCode ||
         authCode.oauthClientId !== client.id ||
-        authCode.consumedAt !== null ||
+        authCode.consumedAt != null ||
         authCode.expiresAt.getTime() <= Date.now()
       ) {
         this.oauthError("invalid_grant", "Invalid, consumed, or expired authorization code.");
@@ -1079,6 +1157,7 @@ export class OAuthProviderService {
         userEmail: authCode.user.email,
         userName: authCode.user.name,
         scopes: authCode.scopes,
+        resource: validatedResource,
         registeredDeviceId,
         issueRefreshToken: true,
       });
@@ -1162,6 +1241,7 @@ export class OAuthProviderService {
         sub: `device:${device.id}`,
         principalType: "DEVICE_TERMINAL",
         scopes: record.scopes,
+        resource: validatedResource,
         registeredDeviceId: device.id,
         issueRefreshToken: true,
       });
@@ -1272,6 +1352,7 @@ export class OAuthProviderService {
         userEmail: existingToken.user?.email ?? null,
         userName: existingToken.user?.name ?? null,
         scopes: existingToken.scopes,
+        resource: validatedResource,
         registeredDeviceId: existingToken.registeredDeviceId,
         existingFamilyId: existingToken.familyId,
         issueRefreshToken: true,
@@ -1295,6 +1376,22 @@ export class OAuthProviderService {
       return null;
     }
 
+    const audClaim = decoded.payload.aud;
+    const audList = Array.isArray(audClaim)
+      ? audClaim
+      : typeof audClaim === "string"
+        ? [audClaim]
+        : [];
+    if (
+      !audList.some(
+        (a) =>
+          typeof a === "string" &&
+          a.replace(/\/+$/, "") === env.OAUTH_ISSUER_URL,
+      )
+    ) {
+      return null;
+    }
+
     const kid = typeof decoded.header.kid === "string" ? decoded.header.kid : "";
     const jwks = await this.getJwks();
     const matchingKey =
@@ -1304,8 +1401,12 @@ export class OAuthProviderService {
     }
 
     const exp = typeof decoded.payload.exp === "number" ? decoded.payload.exp : 0;
+    const nbf = typeof decoded.payload.nbf === "number" ? decoded.payload.nbf : undefined;
     const nowSec = Math.floor(Date.now() / 1000);
     if (!exp || exp <= nowSec) {
+      return null;
+    }
+    if (nbf !== undefined && nbf > nowSec + 30) {
       return null;
     }
 

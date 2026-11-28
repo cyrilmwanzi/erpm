@@ -36,6 +36,25 @@ function extractBearerOrApiKey(req: FastifyRequest): string | null {
   return null;
 }
 
+function extractRequestedOrganizationId(req: FastifyRequest): string | null {
+  const raw = req.headers["x-organization-id"];
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (Array.isArray(raw) && raw.length > 0) {
+    const first = raw[0]?.trim();
+    return first && first.length > 0 ? first : null;
+  }
+  return null;
+}
+
+function buildBearerOnlyHeaders(req: FastifyRequest): Headers {
+  const headers = fromNodeHeaders(req.headers);
+  headers.delete("cookie");
+  return headers;
+}
+
 @Injectable()
 export class UnifiedAuthGuard implements CanActivate {
   constructor(
@@ -58,11 +77,17 @@ export class UnifiedAuthGuard implements CanActivate {
     ]);
 
     const bearer = extractBearerOrApiKey(request);
+    const requestedOrgId = extractRequestedOrganizationId(request);
 
     if (bearer) {
       if (bearer.startsWith("scace_pat_")) {
         const pat = await this.patService.verifyToken(bearer, request.ip);
         if (pat) {
+          if (requestedOrgId && requestedOrgId !== pat.organizationId) {
+            throw new ForbiddenException(
+              "Personal Access Token is not authorized for the requested organization.",
+            );
+          }
           request.session = {
             user: {
               id: pat.userId,
@@ -97,6 +122,11 @@ export class UnifiedAuthGuard implements CanActivate {
           request.ip,
         );
         if (oauthToken) {
+          if (requestedOrgId && requestedOrgId !== oauthToken.organizationId) {
+            throw new ForbiddenException(
+              "OAuth2 access token is not authorized for the requested organization.",
+            );
+          }
           const isServicePrincipal = oauthToken.principalType !== "USER";
           request.session = {
             user: {
@@ -124,35 +154,64 @@ export class UnifiedAuthGuard implements CanActivate {
           (request as unknown as { user?: unknown }).user = request.session.user;
           return true;
         }
+        if (!isPublic && !isOptional) {
+          throw new UnauthorizedException("Invalid, expired, or revoked OAuth2 access token.");
+        }
+        return true;
       }
+
+      // Explicit Bearer/API-key token that is neither a PAT nor a 3-part JWT:
+      // validate as Better Auth bearer session or SSO DB session WITHOUT falling back to cookies.
+      let bearerSession = await auth.api.getSession({
+        headers: buildBearerOnlyHeaders(request),
+      });
+
+      if (!bearerSession) {
+        const dbSession = await this.prismaService.raw.session.findUnique({
+          where: { token: bearer },
+          include: { user: true },
+        });
+        if (dbSession && dbSession.expiresAt.getTime() > Date.now()) {
+          bearerSession = {
+            user: dbSession.user,
+            session: dbSession,
+          } as unknown as typeof bearerSession;
+        }
+      }
+
+      if (bearerSession?.user?.id) {
+        const sessionOrgId =
+          (bearerSession.session as { activeOrganizationId?: string | null })
+            ?.activeOrganizationId ?? null;
+        request.session = bearerSession as OrganizationScopedRequest["session"];
+        request.authContext = {
+          authMethod: "BEARER_SESSION",
+          organizationId: requestedOrgId ?? sessionOrgId,
+          isServicePrincipal: false,
+        };
+        (request as unknown as { user?: unknown }).user = bearerSession.user;
+        return true;
+      }
+
+      if (!isPublic && !isOptional) {
+        throw new UnauthorizedException("Invalid or expired bearer token.");
+      }
+      return true;
     }
 
-    // Try Better Auth session (cookies or Better Auth bearer session token)
-    let session = await auth.api.getSession({
+    // Cookie-based Better Auth session when no explicit Bearer/API-Key header was provided
+    const session = await auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
 
-    // Also support direct DB session tokens issued by SSO popup callbacks when passed as Bearer
-    if (!session && bearer && !bearer.startsWith("scace_pat_")) {
-      const dbSession = await this.prismaService.raw.session.findUnique({
-        where: { token: bearer },
-        include: { user: true },
-      });
-      if (dbSession && dbSession.expiresAt.getTime() > Date.now()) {
-        session = {
-          user: dbSession.user,
-          session: dbSession,
-        } as unknown as typeof session;
-      }
-    }
-
     if (session?.user?.id) {
+      const sessionOrgId =
+        (session.session as { activeOrganizationId?: string | null })
+          ?.activeOrganizationId ?? null;
       request.session = session as OrganizationScopedRequest["session"];
       request.authContext = {
-        authMethod: bearer ? "BEARER_SESSION" : "COOKIE_SESSION",
-        organizationId:
-          (session.session as { activeOrganizationId?: string | null })
-            ?.activeOrganizationId ?? null,
+        authMethod: "COOKIE_SESSION",
+        organizationId: requestedOrgId ?? sessionOrgId,
         isServicePrincipal: false,
       };
       (request as unknown as { user?: unknown }).user = session.user;

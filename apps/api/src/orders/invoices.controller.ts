@@ -51,6 +51,28 @@ const listInvoicesQuerySchema = z.object({
   cursor: z.string().trim().min(1).optional(),
 });
 
+const createStandaloneInvoiceLineSchema = z.object({
+  itemId: z.string().trim().min(1),
+  quantity: z.number().int().min(1).max(1_000_000),
+  unitPriceCents: z.number().int().min(0).max(1_000_000_000).optional(),
+  discountCents: z.number().int().min(0).max(1_000_000_000).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  unitOfMeasure: z.string().trim().max(40).nullable().optional(),
+});
+
+const createStandaloneInvoiceSchema = z.object({
+  customerId: z.string().trim().min(1),
+  invoiceNumber: z.string().trim().max(64).optional(),
+  status: z.enum(["DRAFT", "ISSUED"]).optional(),
+  currency: z.string().trim().length(3).transform((v) => v.toUpperCase()).optional(),
+  paymentTermsDays: z.number().int().min(0).max(365).optional(),
+  customerPoNumber: z.string().trim().max(120).nullable().optional(),
+  dueAt: dateStringSchema.nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  taxCents: z.number().int().min(0).max(1_000_000_000).optional(),
+  lines: z.array(createStandaloneInvoiceLineSchema).min(1).max(500),
+});
+
 const issueInvoiceSchema = z.object({
   dueAt: dateStringSchema.nullable().optional(),
 });
@@ -87,6 +109,28 @@ export class InvoicesController {
     @Inject(MpesaPaymentService)
     private readonly mpesaPaymentService: MpesaPaymentService,
   ) {}
+
+  @Post()
+  @RequiredOrgPermissions({ invoice: ["create"] })
+  async createStandaloneInvoice(
+    @CurrentOrganization() tenant: AuthenticatedOrganization,
+    @Body() body: unknown,
+    @Req() req: FastifyRequest,
+  ) {
+    const parsed = createStandaloneInvoiceSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: "Invalid standalone invoice payload.",
+        issues: parsed.error.issues,
+      });
+    }
+
+    return this.invoicesPaymentsService.createStandaloneInvoice(
+      tenant,
+      parsed.data,
+      req.ip,
+    );
+  }
 
   @Get()
   @RequiredOrgPermissions({ invoice: ["read"] })

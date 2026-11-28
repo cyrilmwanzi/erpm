@@ -20,4 +20,5 @@ Releases in this repository are strictly gated on pending changeset files (`.cha
    ```bash
    pnpm release
    ```
-4. In GitHub Actions (`.github/workflows/release.yml`), the release job only executes when pending changeset files are present on `main` (opening/updating the `Version Packages` PR) or when a `Version Packages` PR that consumed changeset files is merged to `main` (tagging, creating GitHub Releases, and publishing `@scace/sdk` if `NPM_TOKEN` is configured).
+4. In GitHub Actions (`.github/workflows/release.yml`), the release job only executes when pending changeset files are present on `main` (opening/updating the `Version Packages` PR), when a `Version Packages` PR that consumed changeset files is merged to `main`, or when manually triggered via `workflow_dispatch` (`force_sdk_publish`).
+5. Publishing `@scace/sdk` supports **GitHub OIDC Trusted Publishing** (with SLSA provenance attestation via `id-token: write` and `npm >= 11.5.1`—no long-lived `NPM_TOKEN` required once Trusted Publishing is configured for `release.yml` on npmjs.com) as well as optional `NPM_TOKEN` fallback (`auth_mode`: `oidc` | `auto` | `token`).

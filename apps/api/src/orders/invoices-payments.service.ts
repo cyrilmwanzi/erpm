@@ -6,21 +6,49 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  CommunicationChannel,
+  CommunicationEventType,
   CustomerPaymentStatus,
+  ItemVariantKind,
+  OrderChannel,
   OrderStatus,
   PaymentMethod,
   Prisma,
   SalesInvoiceStatus,
   OrganizationContext,
 } from "@scace/db";
+import { CommunicationOutboxService } from "../communications/communication-outbox.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { AnalyticsService } from "../observability/analytics.service.js";
 import type { AuthenticatedOrganization } from "../organizations/organization.decorators.js";
+import { CreditControlService } from "./credit-control.service.js";
 import type {
   PrintableInvoiceDocument,
   PrintableParty,
   PrintableReceiptDocument,
 } from "./document-renderer.utils.js";
+
+export interface CreateStandaloneInvoiceLineInput {
+  itemId: string;
+  quantity: number;
+  unitPriceCents?: number;
+  discountCents?: number;
+  description?: string | null;
+  unitOfMeasure?: string | null;
+}
+
+export interface CreateStandaloneInvoiceInput {
+  customerId: string;
+  invoiceNumber?: string;
+  status?: "DRAFT" | "ISSUED";
+  currency?: string;
+  paymentTermsDays?: number;
+  customerPoNumber?: string | null;
+  dueAt?: string | null;
+  notes?: string | null;
+  taxCents?: number;
+  lines: CreateStandaloneInvoiceLineInput[];
+}
 
 export interface CreateInvoiceFromOrderInput {
   invoiceNumber?: string;
@@ -85,9 +113,247 @@ function generateDocNumber(prefix: string): string {
 export class InvoicesPaymentsService {
   constructor(
     @Inject(PrismaService) private readonly prismaService: PrismaService,
+    @Inject(CreditControlService)
+    private readonly creditControlService: CreditControlService,
+    @Inject(CommunicationOutboxService)
+    private readonly outboxService: CommunicationOutboxService,
     @Inject(AnalyticsService)
     private readonly analyticsService: AnalyticsService,
   ) {}
+
+  async createStandaloneInvoice(
+    tenant: AuthenticatedOrganization,
+    input: CreateStandaloneInvoiceInput,
+    ipAddress?: string,
+  ) {
+    const organizationId = this.resolveVerifiedOrganizationId(tenant);
+
+    if (!input.lines || input.lines.length === 0) {
+      throw new BadRequestException("An invoice must have at least one line item.");
+    }
+
+    const customer = await this.prismaService.raw.customer.findFirst({
+      where: { id: input.customerId, organizationId },
+    });
+    if (!customer) {
+      throw new NotFoundException("Customer was not found.");
+    }
+    if (customer.status === "ARCHIVED") {
+      throw new BadRequestException("Cannot create an invoice for an archived customer.");
+    }
+
+    const itemIds = [...new Set(input.lines.map((l) => l.itemId))];
+    const items = await this.prismaService.raw.item.findMany({
+      where: { id: { in: itemIds }, organizationId },
+    });
+    const itemMap = new Map(items.map((it) => [it.id, it]));
+
+    for (const line of input.lines) {
+      const it = itemMap.get(line.itemId);
+      if (!it) {
+        throw new BadRequestException(`Item "${line.itemId}" does not exist in this organization.`);
+      }
+      if (it.variantKind === ItemVariantKind.TEMPLATE) {
+        throw new BadRequestException(`Item "${it.sku}" is a template item. Select a concrete variant SKU.`);
+      }
+    }
+
+    let subtotalCents = 0;
+    let discountTotalCents = 0;
+
+    const calculatedLines = input.lines.map((l) => {
+      const it = itemMap.get(l.itemId)!;
+      const unitPriceCents =
+        l.unitPriceCents !== undefined ? Math.max(0, l.unitPriceCents) : it.salePriceCents;
+      const discountCents =
+        l.discountCents !== undefined ? Math.max(0, l.discountCents) : 0;
+      const lineTotalCents = Math.max(0, l.quantity * unitPriceCents - discountCents);
+
+      subtotalCents += l.quantity * unitPriceCents;
+      discountTotalCents += discountCents;
+
+      return {
+        itemId: it.id,
+        sku: it.sku,
+        description: l.description?.trim() || it.description || it.name,
+        unitOfMeasure: l.unitOfMeasure?.trim() || it.unitOfMeasure || "unit",
+        quantity: l.quantity,
+        unitPriceCents,
+        discountCents,
+        lineTotalCents,
+      };
+    });
+
+    const taxCents = input.taxCents !== undefined ? Math.max(0, input.taxCents) : 0;
+    const totalCents = Math.max(0, subtotalCents - discountTotalCents + taxCents);
+
+    const targetStatus =
+      input.status === "DRAFT" ? SalesInvoiceStatus.DRAFT : SalesInvoiceStatus.ISSUED;
+
+    if (targetStatus === SalesInvoiceStatus.ISSUED) {
+      await this.creditControlService.assertCreditAllowed(
+        organizationId,
+        customer.id,
+        totalCents,
+        { actorRole: tenant.role },
+      );
+    }
+
+    const invoiceNumber =
+      input.invoiceNumber?.trim().toUpperCase() || generateDocNumber("INV");
+    const currency = (input.currency || customer.currency || "USD").toUpperCase();
+    const paymentTermsDays =
+      input.paymentTermsDays !== undefined
+        ? input.paymentTermsDays
+        : customer.paymentTermsDays;
+
+    const now = new Date();
+    const dueAt = input.dueAt
+      ? new Date(input.dueAt)
+      : new Date(now.getTime() + paymentTermsDays * 86_400_000);
+
+    try {
+      const createdInvoice = await this.prismaService.raw.$transaction(async (tx) => {
+        const [org, settings] = await Promise.all([
+          tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { id: true, name: true },
+          }),
+          tx.organizationSettings.findUnique({
+            where: { organizationId },
+            select: { companyLegalName: true },
+          }),
+        ]);
+
+        const invoice = await tx.salesInvoice.create({
+          data: {
+            organizationId,
+            invoiceNumber,
+            customerId: customer.id,
+            orderId: null,
+            customerPoNumber: input.customerPoNumber?.trim() || null,
+            paymentTermsDays,
+            status: targetStatus,
+            currency,
+            subtotalCents,
+            discountTotalCents,
+            taxCents,
+            totalCents,
+            paidAmountCents: 0,
+            issuedAt: targetStatus === SalesInvoiceStatus.ISSUED ? now : null,
+            dueAt,
+            notes: input.notes?.trim() || null,
+            customerSnapshot: {
+              id: customer.id,
+              code: customer.code,
+              type: customer.type,
+              name: customer.name,
+              companyName: customer.companyName,
+              email: customer.email,
+              phone: customer.phone,
+              taxId: customer.taxId,
+              billingAddressLine1: customer.billingAddressLine1,
+              billingAddressLine2: customer.billingAddressLine2,
+              billingCity: customer.billingCity,
+              billingState: customer.billingState,
+              billingPostalCode: customer.billingPostalCode,
+              billingCountry: customer.billingCountry,
+            } as Prisma.InputJsonValue,
+            organizationSnapshot: {
+              id: organizationId,
+              name: org?.name ?? "Organization",
+              companyLegalName:
+                settings?.companyLegalName ?? org?.name ?? "Organization",
+            } as Prisma.InputJsonValue,
+            createdByUserId: tenant.userId,
+            updatedByUserId: tenant.userId,
+            lines: {
+              create: calculatedLines.map((l) => ({
+                organizationId,
+                itemId: l.itemId,
+                sku: l.sku,
+                description: l.description,
+                unitOfMeasure: l.unitOfMeasure,
+                quantity: l.quantity,
+                unitPriceCents: l.unitPriceCents,
+                discountCents: l.discountCents,
+                lineTotalCents: l.lineTotalCents,
+              })),
+            },
+          },
+          include: {
+            customer: true,
+            lines: true,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            actorUserId: tenant.userId,
+            action: "invoice.created",
+            resourceType: "SalesInvoice",
+            resourceId: invoice.id,
+            metadata: {
+              invoiceNumber: invoice.invoiceNumber,
+              customerPoNumber: invoice.customerPoNumber,
+              status: invoice.status,
+              totalCents: invoice.totalCents,
+            } as Prisma.InputJsonValue,
+            ipAddress: ipAddress ?? null,
+          },
+        });
+
+        return {
+          ...invoice,
+          balanceDueCents: invoice.totalCents,
+        };
+      });
+
+      if (targetStatus === SalesInvoiceStatus.ISSUED && customer.email) {
+        await this.outboxService.emitEvent(null, {
+          organizationId,
+          eventType: CommunicationEventType.INVOICE_ISSUED,
+          targetEmails: [customer.email],
+          channelHints: [CommunicationChannel.EMAIL],
+          subject: `Invoice ${createdInvoice.invoiceNumber}`,
+          summaryText: `An invoice has been issued. Total Due: ${createdInvoice.currency} ${(createdInvoice.totalCents / 100).toFixed(2)}, due on ${dueAt.toISOString().slice(0, 10)}.`,
+          sourceEntityType: "SalesInvoice",
+          sourceEntityId: createdInvoice.id,
+          payload: {
+            invoiceId: createdInvoice.id,
+            invoiceNumber: createdInvoice.invoiceNumber,
+            customerId: customer.id,
+            totalCents: createdInvoice.totalCents,
+            dueAt: dueAt.toISOString(),
+          },
+        });
+      }
+
+      this.analyticsService.captureDomainEvent({
+        event: "invoice.created",
+        distinctId: tenant.userId,
+        organizationId,
+        properties: {
+          invoice_id: createdInvoice.id,
+          invoice_number: createdInvoice.invoiceNumber,
+          is_standalone: true,
+          status: createdInvoice.status,
+          currency: createdInvoice.currency,
+          total_cents: createdInvoice.totalCents,
+        },
+      });
+
+      return createdInvoice;
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(
+          `Invoice number "${invoiceNumber}" already exists in this organization.`,
+        );
+      }
+      throw error;
+    }
+  }
 
   async createInvoiceFromOrder(
     tenant: AuthenticatedOrganization,
@@ -153,6 +419,15 @@ export class InvoicesPaymentsService {
               ? SalesInvoiceStatus.PARTIALLY_PAID
               : targetStatus;
 
+        if (computedStatus === SalesInvoiceStatus.ISSUED && order.customerId) {
+          await this.creditControlService.assertCreditAllowed(
+            organizationId,
+            order.customerId,
+            totalCents,
+            { actorRole: tenant.role },
+          );
+        }
+
         const dueAt = input.dueAt
           ? new Date(input.dueAt)
           : new Date(
@@ -166,6 +441,9 @@ export class InvoicesPaymentsService {
             invoiceNumber,
             orderId: order.id,
             customerId: order.customerId,
+            customerPurchaseOrderId: order.customerPurchaseOrderId,
+            customerPoNumber: order.customerPoNumber,
+            paymentTermsDays: order.customer?.paymentTermsDays ?? 30,
             status: computedStatus,
             currency: order.currency,
             subtotalCents: order.subtotalCents,
@@ -249,6 +527,28 @@ export class InvoicesPaymentsService {
         };
       });
 
+      if (
+        createdInvoice.status === SalesInvoiceStatus.ISSUED &&
+        createdInvoice.customer?.email
+      ) {
+        await this.outboxService.emitEvent(null, {
+          organizationId,
+          eventType: CommunicationEventType.INVOICE_ISSUED,
+          targetEmails: [createdInvoice.customer.email],
+          channelHints: [CommunicationChannel.EMAIL],
+          subject: `Invoice ${createdInvoice.invoiceNumber}`,
+          summaryText: `Invoice ${createdInvoice.invoiceNumber} has been issued. Amount due: ${createdInvoice.currency} ${(createdInvoice.totalCents / 100).toFixed(2)}.`,
+          sourceEntityType: "SalesInvoice",
+          sourceEntityId: createdInvoice.id,
+          payload: {
+            invoiceId: createdInvoice.id,
+            invoiceNumber: createdInvoice.invoiceNumber,
+            totalCents: createdInvoice.totalCents,
+            dueAt: createdInvoice.dueAt?.toISOString() ?? null,
+          },
+        });
+      }
+
       this.analyticsService.captureDomainEvent({
         event: "invoice.created",
         distinctId: tenant.userId,
@@ -296,13 +596,22 @@ export class InvoicesPaymentsService {
         );
       }
 
+      if (existing.customerId) {
+        await this.creditControlService.assertCreditAllowed(
+          organizationId,
+          existing.customerId,
+          existing.totalCents,
+          { actorRole: tenant.role },
+        );
+      }
+
       const now = new Date();
       const resolvedDueAt = dueAt
         ? new Date(dueAt)
         : existing.dueAt ??
           new Date(
             now.getTime() +
-              (existing.customer?.paymentTermsDays ?? 30) * 86_400_000,
+              (existing.paymentTermsDays || existing.customer?.paymentTermsDays || 30) * 86_400_000,
           );
 
       const claimed = await tx.salesInvoice.updateMany({
@@ -352,6 +661,26 @@ export class InvoicesPaymentsService {
         balanceDueCents: Math.max(0, updated.totalCents - updated.paidAmountCents),
       };
     });
+
+    if (result.customer?.email) {
+      await this.outboxService.emitEvent(null, {
+        organizationId,
+        eventType: CommunicationEventType.INVOICE_ISSUED,
+        targetEmails: [result.customer.email],
+        channelHints: [CommunicationChannel.EMAIL],
+        subject: `Invoice ${result.invoiceNumber} Issued`,
+        summaryText: `Invoice ${result.invoiceNumber} has been issued. Total Due: ${result.currency} ${(result.totalCents / 100).toFixed(2)}, due on ${result.dueAt ? result.dueAt.toISOString().slice(0, 10) : "-"}.`,
+        sourceEntityType: "SalesInvoice",
+        sourceEntityId: result.id,
+        payload: {
+          invoiceId: result.id,
+          invoiceNumber: result.invoiceNumber,
+          customerId: result.customerId,
+          totalCents: result.totalCents,
+          dueAt: result.dueAt?.toISOString() ?? null,
+        },
+      });
+    }
 
     this.analyticsService.captureDomainEvent({
       event: "invoice.issued",
@@ -562,24 +891,26 @@ export class InvoicesPaymentsService {
         );
       }
 
-      const nextOrderPaid = Math.min(
-        invoice.order.totalCents,
-        invoice.order.paidAmountCents + amountAppliedCents,
-      );
-      const shouldCompleteOrder =
-        invoice.order.status === OrderStatus.FULFILLED &&
-        nextOrderPaid >= invoice.order.totalCents;
+      if (invoice.order && invoice.orderId) {
+        const nextOrderPaid = Math.min(
+          invoice.order.totalCents,
+          invoice.order.paidAmountCents + amountAppliedCents,
+        );
+        const shouldCompleteOrder =
+          invoice.order.status === OrderStatus.FULFILLED &&
+          nextOrderPaid >= invoice.order.totalCents;
 
-      await tx.order.update({
-        where: { id: invoice.orderId },
-        data: {
-          paidAmountCents: nextOrderPaid,
-          ...(shouldCompleteOrder
-            ? { status: OrderStatus.COMPLETED, completedAt: now }
-            : {}),
-          updatedByUserId: tenant.userId,
-        },
-      });
+        await tx.order.update({
+          where: { id: invoice.orderId },
+          data: {
+            paidAmountCents: nextOrderPaid,
+            ...(shouldCompleteOrder
+              ? { status: OrderStatus.COMPLETED, completedAt: now }
+              : {}),
+            updatedByUserId: tenant.userId,
+          },
+        });
+      }
 
       const paymentNumber = generateDocNumber("PAY");
       const receiptNumber = generateDocNumber("RCP");
@@ -609,17 +940,18 @@ export class InvoicesPaymentsService {
         companyLegalName?: string;
       } | null;
 
+      const resolvedChannel = invoice.order?.channel ?? OrderChannel.B2B;
       const receiptSnapshot: PrintableReceiptDocument = {
         receiptNumber,
         paymentNumber,
-        orderNumber: invoice.order.orderNumber,
+        orderNumber: invoice.order?.orderNumber ?? invoice.invoiceNumber,
         invoiceNumber: invoice.invoiceNumber,
-        channel: invoice.order.channel,
+        channel: resolvedChannel,
         paymentMethod: PaymentMethod.CASH,
         currency: invoice.currency,
         issuedAt: now.toISOString(),
-        locationName: invoice.order.location.name,
-        locationCode: invoice.order.location.code,
+        locationName: invoice.order?.location?.name ?? null,
+        locationCode: invoice.order?.location?.code ?? null,
         subtotalCents: invoice.subtotalCents,
         discountTotalCents: invoice.discountTotalCents,
         taxCents: invoice.taxCents,
@@ -661,7 +993,7 @@ export class InvoicesPaymentsService {
           orderId: invoice.orderId,
           salesInvoiceId: invoice.id,
           customerId: invoice.customerId,
-          channel: invoice.order.channel,
+          channel: resolvedChannel,
           currency: invoice.currency,
           totalCents: invoice.totalCents,
           cashTenderedCents,
@@ -893,7 +1225,9 @@ export class InvoicesPaymentsService {
 
     return {
       invoiceNumber: invoice.invoiceNumber,
-      orderNumber: invoice.order.orderNumber,
+      orderNumber: invoice.order?.orderNumber ?? null,
+      customerPoNumber: invoice.customerPoNumber ?? null,
+      paymentTermsDays: invoice.paymentTermsDays,
       status: invoice.status,
       currency: invoice.currency,
       issuedAt: invoice.issuedAt ? invoice.issuedAt.toISOString() : null,
@@ -1062,7 +1396,7 @@ export class InvoicesPaymentsService {
     return {
       receiptNumber: receipt.receiptNumber,
       paymentNumber: receipt.payment.paymentNumber,
-      orderNumber: receipt.order.orderNumber,
+      orderNumber: receipt.order?.orderNumber ?? receipt.salesInvoice?.invoiceNumber ?? receipt.receiptNumber,
       invoiceNumber: receipt.salesInvoice?.invoiceNumber ?? null,
       channel: receipt.channel,
       paymentMethod: receipt.payment.method,

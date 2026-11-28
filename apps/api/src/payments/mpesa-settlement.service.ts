@@ -174,6 +174,34 @@ export class MpesaSettlementService {
         } | null;
       } | null = null;
       let resolvedInvoiceNumber: string | null = null;
+      let resolvedInvoice: {
+        id: string;
+        invoiceNumber: string;
+        currency: string;
+        subtotalCents: number;
+        discountTotalCents: number;
+        taxCents: number;
+        totalCents: number;
+        notes: string | null;
+        customer: {
+          id: string;
+          code: string;
+          name: string;
+          companyName: string | null;
+          email: string | null;
+          phone: string | null;
+          taxId: string | null;
+        } | null;
+        lines: Array<{
+          sku: string | null;
+          description: string;
+          unitOfMeasure: string;
+          quantity: number;
+          unitPriceCents: number;
+          discountCents: number;
+          lineTotalCents: number;
+        }>;
+      } | null = null;
 
       if (targetType === PaymentTargetType.SALES_INVOICE || salesInvoiceId) {
         if (!salesInvoiceId) {
@@ -182,6 +210,18 @@ export class MpesaSettlementService {
         const invoice = await tx.salesInvoice.findFirst({
           where: { id: salesInvoiceId, organizationId },
           include: {
+            customer: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                companyName: true,
+                email: true,
+                phone: true,
+                taxId: true,
+              },
+            },
+            lines: true,
             order: {
               include: {
                 location: { select: { id: true, code: true, name: true } },
@@ -253,42 +293,45 @@ export class MpesaSettlementService {
           );
         }
 
-        orderId = invoice.orderId;
-        fulfillmentId = invoice.order.fulfillment?.id ?? fulfillmentId;
+        orderId = invoice.orderId ?? null;
+        fulfillmentId = invoice.order?.fulfillment?.id ?? fulfillmentId;
         resolvedInvoiceNumber = invoice.invoiceNumber;
         resolvedOrder = invoice.order;
+        resolvedInvoice = invoice;
 
-        const nextOrderPaid = Math.min(
-          invoice.order.totalCents,
-          invoice.order.paidAmountCents + amountAppliedCents,
-        );
-        const shouldCompleteOrder =
-          invoice.order.status === OrderStatus.FULFILLED &&
-          nextOrderPaid >= invoice.order.totalCents;
+        if (invoice.order && invoice.orderId) {
+          const nextOrderPaid = Math.min(
+            invoice.order.totalCents,
+            invoice.order.paidAmountCents + amountAppliedCents,
+          );
+          const shouldCompleteOrder =
+            invoice.order.status === OrderStatus.FULFILLED &&
+            nextOrderPaid >= invoice.order.totalCents;
 
-        await tx.order.update({
-          where: { id: invoice.orderId },
-          data: {
-            paidAmountCents: nextOrderPaid,
-            ...(shouldCompleteOrder
-              ? { status: OrderStatus.COMPLETED, completedAt: now }
-              : {}),
-            ...(input.actorUserId ? { updatedByUserId: input.actorUserId } : {}),
-          },
-        });
-
-        if (invoice.order.fulfillment) {
-          await tx.orderFulfillment.update({
-            where: { id: invoice.order.fulfillment.id },
+          await tx.order.update({
+            where: { id: invoice.orderId },
             data: {
-              depositStatus: computeDepositStatus(
-                invoice.order.fulfillment.depositRequiredCents,
-                nextOrderPaid,
-                invoice.order.totalCents,
-              ),
+              paidAmountCents: nextOrderPaid,
+              ...(shouldCompleteOrder
+                ? { status: OrderStatus.COMPLETED, completedAt: now }
+                : {}),
               ...(input.actorUserId ? { updatedByUserId: input.actorUserId } : {}),
             },
           });
+
+          if (invoice.order.fulfillment) {
+            await tx.orderFulfillment.update({
+              where: { id: invoice.order.fulfillment.id },
+              data: {
+                depositStatus: computeDepositStatus(
+                  invoice.order.fulfillment.depositRequiredCents,
+                  nextOrderPaid,
+                  invoice.order.totalCents,
+                ),
+                ...(input.actorUserId ? { updatedByUserId: input.actorUserId } : {}),
+              },
+            });
+          }
         }
       } else if (targetType === PaymentTargetType.FULFILLMENT || fulfillmentId) {
         if (!fulfillmentId) {
@@ -564,9 +607,44 @@ export class MpesaSettlementService {
         throw new BadRequestException("Payment transaction has no valid settlement target.");
       }
 
-      if (!resolvedOrder || !orderId) {
-        throw new BadRequestException("Unable to resolve order for payment receipt.");
+      if (!resolvedOrder && !resolvedInvoice) {
+        throw new BadRequestException("Unable to resolve order or invoice for payment receipt.");
       }
+
+      const resolvedCustomer =
+        resolvedOrder?.customer ?? resolvedInvoice?.customer ?? null;
+      const resolvedChannel = resolvedOrder?.channel ?? OrderChannel.B2B;
+      const resolvedCurrency =
+        resolvedOrder?.currency ?? resolvedInvoice!.currency;
+      const resolvedSubtotalCents =
+        resolvedOrder?.subtotalCents ?? resolvedInvoice!.subtotalCents;
+      const resolvedDiscountTotalCents =
+        resolvedOrder?.discountTotalCents ?? resolvedInvoice!.discountTotalCents;
+      const resolvedTaxCents =
+        resolvedOrder?.taxCents ?? resolvedInvoice!.taxCents;
+      const resolvedTotalCents =
+        resolvedOrder?.totalCents ?? resolvedInvoice!.totalCents;
+      const resolvedNotes =
+        resolvedOrder?.notes ?? resolvedInvoice?.notes ?? null;
+      const resolvedLines = resolvedOrder
+        ? resolvedOrder.lines.map((l) => ({
+            sku: l.sku,
+            description: l.description || l.name,
+            unitOfMeasure: l.unitOfMeasure,
+            quantity: l.quantity,
+            unitPriceCents: l.unitPriceCents,
+            discountCents: l.discountCents,
+            lineTotalCents: l.lineTotalCents,
+          }))
+        : resolvedInvoice!.lines.map((l) => ({
+            sku: l.sku,
+            description: l.description,
+            unitOfMeasure: l.unitOfMeasure,
+            quantity: l.quantity,
+            unitPriceCents: l.unitPriceCents,
+            discountCents: l.discountCents,
+            lineTotalCents: l.lineTotalCents,
+          }));
 
       const paymentNumber = generateDocNumber("PAY");
       const receiptNumber = generateDocNumber("RCP");
@@ -575,12 +653,12 @@ export class MpesaSettlementService {
         data: {
           organizationId,
           paymentNumber,
-          orderId,
+          orderId: orderId ?? null,
           salesInvoiceId: salesInvoiceId ?? null,
-          customerId: resolvedOrder.customer?.id ?? txRecord.customerId ?? null,
+          customerId: resolvedCustomer?.id ?? txRecord.customerId ?? null,
           method: PaymentMethod.MPESA,
           status: CustomerPaymentStatus.COMPLETED,
-          currency: resolvedOrder.currency,
+          currency: resolvedCurrency,
           amountAppliedCents,
           cashTenderedCents: amountAppliedCents,
           changeGivenCents: 0,
@@ -596,48 +674,40 @@ export class MpesaSettlementService {
       const receiptSnapshot: PrintableReceiptDocument = {
         receiptNumber,
         paymentNumber,
-        orderNumber: resolvedOrder.orderNumber,
+        orderNumber: resolvedOrder?.orderNumber ?? resolvedInvoice!.invoiceNumber,
         invoiceNumber: resolvedInvoiceNumber,
-        channel: resolvedOrder.channel,
+        channel: resolvedChannel,
         paymentMethod: PaymentMethod.MPESA,
         reference: input.mpesaReceiptNumber,
         mpesaReceiptNumber: input.mpesaReceiptNumber,
         phoneNumber: input.phoneNumber ?? txRecord.phoneNumber ?? null,
-        currency: resolvedOrder.currency,
+        currency: resolvedCurrency,
         issuedAt: now.toISOString(),
-        locationName: resolvedOrder.location.name,
-        locationCode: resolvedOrder.location.code,
-        subtotalCents: resolvedOrder.subtotalCents,
-        discountTotalCents: resolvedOrder.discountTotalCents,
-        taxCents: resolvedOrder.taxCents,
-        totalCents: resolvedOrder.totalCents,
+        locationName: resolvedOrder?.location.name ?? null,
+        locationCode: resolvedOrder?.location.code ?? null,
+        subtotalCents: resolvedSubtotalCents,
+        discountTotalCents: resolvedDiscountTotalCents,
+        taxCents: resolvedTaxCents,
+        totalCents: resolvedTotalCents,
         amountAppliedCents,
         cashTenderedCents: amountAppliedCents,
         changeGivenCents: 0,
-        notes: resolvedOrder.notes,
+        notes: resolvedNotes,
         organization: {
           name: org?.name ?? "Organization",
           companyName: settings?.companyLegalName ?? org?.name ?? "Organization",
         },
-        customer: resolvedOrder.customer
+        customer: resolvedCustomer
           ? {
-              name: resolvedOrder.customer.name,
-              companyName: resolvedOrder.customer.companyName,
-              code: resolvedOrder.customer.code,
-              email: resolvedOrder.customer.email,
-              phone: resolvedOrder.customer.phone,
-              taxId: resolvedOrder.customer.taxId,
+              name: resolvedCustomer.name,
+              companyName: resolvedCustomer.companyName,
+              code: resolvedCustomer.code,
+              email: resolvedCustomer.email,
+              phone: resolvedCustomer.phone,
+              taxId: resolvedCustomer.taxId,
             }
           : null,
-        lines: resolvedOrder.lines.map((l) => ({
-          sku: l.sku,
-          description: l.description || l.name,
-          unitOfMeasure: l.unitOfMeasure,
-          quantity: l.quantity,
-          unitPriceCents: l.unitPriceCents,
-          discountCents: l.discountCents,
-          lineTotalCents: l.lineTotalCents,
-        })),
+        lines: resolvedLines,
       };
 
       const receipt = await tx.paymentReceipt.create({
@@ -645,12 +715,12 @@ export class MpesaSettlementService {
           organizationId,
           receiptNumber,
           paymentId: payment.id,
-          orderId,
+          orderId: orderId ?? null,
           salesInvoiceId: salesInvoiceId ?? null,
-          customerId: resolvedOrder.customer?.id ?? txRecord.customerId ?? null,
-          channel: resolvedOrder.channel,
-          currency: resolvedOrder.currency,
-          totalCents: resolvedOrder.totalCents,
+          customerId: resolvedCustomer?.id ?? txRecord.customerId ?? null,
+          channel: resolvedChannel,
+          currency: resolvedCurrency,
+          totalCents: resolvedTotalCents,
           cashTenderedCents: amountAppliedCents,
           changeGivenCents: 0,
           snapshot: receiptSnapshot as unknown as Prisma.InputJsonValue,
@@ -674,10 +744,10 @@ export class MpesaSettlementService {
         data: {
           status: PaymentTransactionStatus.SUCCEEDED,
           targetType,
-          orderId,
+          orderId: orderId ?? null,
           salesInvoiceId: salesInvoiceId ?? null,
           fulfillmentId: fulfillmentId ?? null,
-          customerId: resolvedOrder.customer?.id ?? txRecord.customerId ?? null,
+          customerId: resolvedCustomer?.id ?? txRecord.customerId ?? null,
           customerPaymentId: payment.id,
           mpesaReceiptNumber: input.mpesaReceiptNumber,
           ...(input.phoneNumber ? { phoneNumber: input.phoneNumber } : {}),

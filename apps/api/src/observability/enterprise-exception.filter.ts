@@ -24,6 +24,7 @@ export type CorrelationRequest = OrganizationScopedRequest & {
 export interface EnterpriseErrorEnvelope {
   statusCode: number;
   error: string;
+  error_description?: string;
   code: string;
   message: string;
   requestId: string;
@@ -120,6 +121,9 @@ export class EnterpriseExceptionFilter implements ExceptionFilter {
     const envelope: EnterpriseErrorEnvelope = {
       statusCode: normalized.statusCode,
       error: normalized.error,
+      ...(normalized.errorDescription
+        ? { error_description: normalized.errorDescription }
+        : {}),
       code: normalized.code,
       message: normalized.message,
       requestId,
@@ -130,6 +134,21 @@ export class EnterpriseExceptionFilter implements ExceptionFilter {
     };
 
     if (!reply.sent) {
+      if (normalized.statusCode === 401 && !reply.getHeader("www-authenticate")) {
+        const isOAuthTokenEndpoint =
+          cleanPath.startsWith("/api/v1/oauth/token") ||
+          cleanPath.startsWith("/api/v1/oauth/introspect") ||
+          cleanPath.startsWith("/api/v1/oauth/revoke") ||
+          cleanPath.startsWith("/api/v1/oauth/device/code");
+        const resourceMetadataUrl = `${env.OAUTH_ISSUER_URL}/.well-known/oauth-protected-resource`;
+        reply.header(
+          "WWW-Authenticate",
+          isOAuthTokenEndpoint
+            ? 'Basic realm="scace-oauth"'
+            : `Bearer resource_metadata="${resourceMetadataUrl}"`,
+        );
+      }
+
       void reply
         .header("X-Request-Id", requestId)
         .code(normalized.statusCode)

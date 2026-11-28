@@ -22,12 +22,15 @@ import {
 import { OAuthProviderService } from "./oauth-provider.service.js";
 
 const authorizeSchema = z.object({
+  responseType: z.enum(["code"]).optional(),
+  response_type: z.enum(["code"]).optional(),
   clientId: z.string().trim().min(1).optional(),
   client_id: z.string().trim().min(1).optional(),
   redirectUri: z.string().trim().min(1).optional(),
   redirect_uri: z.string().trim().min(1).optional(),
   scope: z.string().trim().optional(),
   state: z.string().trim().max(500).optional(),
+  resource: z.string().trim().url().optional(),
   codeChallenge: z.string().trim().min(43).max(128).optional(),
   code_challenge: z.string().trim().min(43).max(128).optional(),
   codeChallengeMethod: z.enum(["S256"]).optional(),
@@ -67,6 +70,22 @@ export class OAuthProviderController {
     return this.oauthProviderService.getOpenIdConfiguration();
   }
 
+  @Get(".well-known/oauth-protected-resource")
+  @AllowAnonymous()
+  getProtectedResourceMetadata() {
+    return this.oauthProviderService.getProtectedResourceMetadata();
+  }
+
+  @Get(".well-known/oauth-protected-resource/*")
+  @AllowAnonymous()
+  getSubpathProtectedResourceMetadata(@Req() req: FastifyRequest) {
+    const cleanPath = (req.url.split("?")[0] ?? "").replace(
+      /^\/?\.well-known\/oauth-protected-resource\/?/,
+      "",
+    );
+    return this.oauthProviderService.getProtectedResourceMetadata(cleanPath);
+  }
+
   @Get(".well-known/jwks.json")
   @AllowAnonymous()
   async getJwks() {
@@ -80,7 +99,7 @@ export class OAuthProviderController {
     @Query() query: unknown,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    return this.handleAuthorize(tenant, query, reply);
+    return this.handleAuthorize(tenant, query, reply, "redirect");
   }
 
   @Post("api/v1/oauth/authorize")
@@ -90,13 +109,14 @@ export class OAuthProviderController {
     @Body() body: unknown,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    return this.handleAuthorize(tenant, body, reply);
+    return this.handleAuthorize(tenant, body, reply, "json");
   }
 
   private async handleAuthorize(
     tenant: AuthenticatedOrganization,
     rawInput: unknown,
     reply: FastifyReply,
+    defaultResponseMode: "json" | "redirect",
   ) {
     const parsed = authorizeSchema.safeParse(rawInput ?? {});
     if (!parsed.success) {
@@ -111,6 +131,7 @@ export class OAuthProviderController {
     const redirectUri = d.redirectUri ?? d.redirect_uri;
     const codeChallenge = d.codeChallenge ?? d.code_challenge;
     const codeChallengeMethod = d.codeChallengeMethod ?? d.code_challenge_method ?? "S256";
+    const responseMode = d.responseMode ?? defaultResponseMode;
 
     if (!clientId || !redirectUri || !codeChallenge) {
       throw new BadRequestException(
@@ -123,6 +144,7 @@ export class OAuthProviderController {
       redirectUri,
       scope: d.scope,
       state: d.state,
+      resource: d.resource,
       codeChallenge,
       codeChallengeMethod,
       nonce: d.nonce,
@@ -132,7 +154,7 @@ export class OAuthProviderController {
       deviceAppVersion: d.deviceAppVersion,
     });
 
-    if (d.responseMode === "redirect") {
+    if (responseMode === "redirect") {
       reply.redirect(result.redirectTo, 302);
       return;
     }

@@ -40,10 +40,12 @@ async function bootstrap() {
       "Authorization",
       "X-Requested-With",
       "X-API-Key",
+      "X-Organization-Id",
       "X-Request-Id",
     ],
     exposedHeaders: [
       "X-Request-Id",
+      "WWW-Authenticate",
       "X-Scace-Billing-Status",
       "X-Scace-Grace-Ends-At",
       "X-Scace-Plan-Code",

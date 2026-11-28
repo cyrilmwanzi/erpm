@@ -20,7 +20,9 @@ export interface PrintableParty {
 
 export interface PrintableInvoiceDocument {
   invoiceNumber: string;
-  orderNumber: string;
+  orderNumber?: string | null;
+  customerPoNumber?: string | null;
+  paymentTermsDays?: number | null;
   status: string;
   currency: string;
   issuedAt: string | null;
@@ -172,7 +174,9 @@ export function renderInvoiceHtml(doc: PrintableInvoiceDocument): string {
       </div>
       <div class="meta">
         <div><strong>Invoice #:</strong> ${escapeHtml(doc.invoiceNumber)}</div>
-        <div><strong>Order #:</strong> ${escapeHtml(doc.orderNumber)}</div>
+        ${doc.orderNumber ? `<div><strong>Order #:</strong> ${escapeHtml(doc.orderNumber)}</div>` : ""}
+        ${doc.customerPoNumber ? `<div><strong>Customer PO #:</strong> ${escapeHtml(doc.customerPoNumber)}</div>` : ""}
+        ${doc.paymentTermsDays !== undefined && doc.paymentTermsDays !== null && doc.paymentTermsDays > 0 ? `<div><strong>Terms:</strong> Net ${doc.paymentTermsDays} Days</div>` : ""}
         <div><strong>Issued:</strong> ${escapeHtml(formatDateLabel(doc.issuedAt))}</div>
         <div><strong>Due:</strong> ${escapeHtml(formatDateLabel(doc.dueAt))}</div>
         ${doc.paidAt ? `<div><strong>Paid:</strong> ${escapeHtml(formatDateLabel(doc.paidAt))}</div>` : ""}
@@ -501,11 +505,24 @@ export function renderInvoicePdf(doc: PrintableInvoiceDocument): Buffer {
     size: 10,
     bold: true,
   });
-  pdf.rightText(551, 758, `Order #: ${doc.orderNumber}`, { size: 9.5 });
-  pdf.rightText(551, 744, `Issued: ${formatDateLabel(doc.issuedAt)}`, {
+  let topY = 758;
+  if (doc.orderNumber) {
+    pdf.rightText(551, topY, `Order #: ${doc.orderNumber}`, { size: 9.5 });
+    topY -= 14;
+  }
+  if (doc.customerPoNumber) {
+    pdf.rightText(551, topY, `PO #: ${doc.customerPoNumber}`, { size: 9.5 });
+    topY -= 14;
+  }
+  if (doc.paymentTermsDays !== undefined && doc.paymentTermsDays !== null && doc.paymentTermsDays > 0) {
+    pdf.rightText(551, topY, `Terms: Net ${doc.paymentTermsDays} Days`, { size: 9.5 });
+    topY -= 14;
+  }
+  pdf.rightText(551, topY, `Issued: ${formatDateLabel(doc.issuedAt)}`, {
     size: 9.5,
   });
-  pdf.rightText(551, 730, `Due: ${formatDateLabel(doc.dueAt)}`, { size: 9.5 });
+  topY -= 14;
+  pdf.rightText(551, topY, `Due: ${formatDateLabel(doc.dueAt)}`, { size: 9.5 });
 
   pdf.advance(46);
   pdf.divider(4, 14, 1.2);

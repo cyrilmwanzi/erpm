@@ -4,6 +4,23 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish_sdk:
+        description: "Publish @scace/sdk to npm"
+        type: boolean
+        default: true
+      auth_mode:
+        description: "npm publish authentication mode"
+        type: choice
+        options:
+          - oidc
+          - auto
+          - token
+        default: oidc
+      force_sdk_publish:
+        description: "Run release/publish even without pending or consumed changeset files"
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -33,13 +50,24 @@ jobs:
 
       - name: Detect pending or consumed changeset files
         id: detect
-        run: node scripts/release.mjs check --github-commit
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force_sdk_publish }}" = "true" ]; then
+            node scripts/release.mjs check --github-commit --force
+          else
+            node scripts/release.mjs check --github-commit
+          fi
 
   release:
     name: Version, Tag & Release
     needs: check-changesets
     if: needs.check-changesets.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
+      id-token: write
 
     env:
       NODE_ENV: test
@@ -64,7 +92,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm >= 11.5.1 for GitHub OIDC Trusted Publishing
+        run: npm install -g npm@^11.5.1 && npm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -91,16 +121,28 @@ jobs:
           file: apps/docs/Dockerfile
           push: false
 
+      - name: Determine release publish command
+        id: publish_cmd
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force_sdk_publish }}" = "true" ]; then
+            echo "command=pnpm release:publish-ci -- --force" >> "$GITHUB_OUTPUT"
+          else
+            echo "command=pnpm release:publish-ci" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release Pull Request or Publish/Tag Releases
         id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm release:version
-          publish: pnpm release:publish-ci
+          publish: ${{ steps.publish_cmd.outputs.command }}
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          SDK_PUBLISH_ENABLED: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_sdk }}
+          SDK_PUBLISH_AUTH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.auth_mode || vars.SDK_PUBLISH_AUTH_MODE || 'auto' }}
+          SDK_PUBLISH_OIDC: ${{ vars.SDK_PUBLISH_OIDC || 'true' }}
+          SCACE_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"

@@ -64,3 +64,16 @@ if (!result.ok) {
 ```bash
 pnpm --filter @scace/sdk sdk:generate
 ```
+
+## Publishing via GitHub OIDC Trusted Publishing
+
+`@scace/sdk` supports keyless npm publishing with SLSA provenance attestation via **GitHub OIDC Trusted Publishing** (`.github/workflows/release.yml`) using `id-token: write` and `npm >= 11.5.1`:
+
+1. Configure a Trusted Publisher on `npmjs.com` for `@scace/sdk` pointing to this GitHub repository and workflow file `release.yml`.
+2. Trigger releases via a Changesets PR merge on `main` or manually via `workflow_dispatch` with `auth_mode: oidc` (or `auto` / `token` if using `NPM_TOKEN`).
+3. Verify the packed tarball locally before publishing:
+
+```bash
+pnpm --filter @scace/sdk publish:dry-run
+```
+

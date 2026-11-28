@@ -46,6 +46,8 @@ export class RootController {
         fulfillments: "/api/v1/fulfillments",
         staffJobs: "/api/v1/staff-jobs",
         openidConfiguration: "/.well-known/openid-configuration",
+        oauthAuthorizationServer: "/.well-known/oauth-authorization-server",
+        oauthProtectedResource: "/.well-known/oauth-protected-resource",
         jwks: "/.well-known/jwks.json",
         oauthAuthorize: "/api/v1/oauth/authorize",
         oauthToken: "/api/v1/oauth/token",

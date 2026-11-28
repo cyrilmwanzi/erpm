@@ -45,6 +45,8 @@ export const ORGANIZATION_SCOPED_MODELS = new Set<string>([
   "QuarantineHold",
   "SupplierClaim",
   "Customer",
+  "CustomerPurchaseOrder",
+  "CustomerPurchaseOrderLine",
   "Order",
   "OrderLine",
   "SalesInvoice",
@@ -346,6 +348,34 @@ function stripOrganizationOverride(
   return rest;
 }
 
+function sanitizeAuditLogData(
+  model: string,
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  if (model !== "AuditLog") {
+    return data;
+  }
+  const actorUserId = data.actorUserId;
+  if (
+    typeof actorUserId === "string" &&
+    (actorUserId.startsWith("service:") || actorUserId.startsWith("device:"))
+  ) {
+    const existingMeta =
+      data.metadata && typeof data.metadata === "object" && !Array.isArray(data.metadata)
+        ? (data.metadata as Record<string, unknown>)
+        : {};
+    return {
+      ...data,
+      actorUserId: null,
+      metadata: {
+        actorPrincipalId: actorUserId,
+        ...existingMeta,
+      },
+    };
+  }
+  return data;
+}
+
 export function withOrganizationIsolation(
   baseClient: PrismaClient,
   explicitOrganizationId?: string,
@@ -412,8 +442,11 @@ export function withOrganizationIsolation(
             }
 
             case "create": {
-              const cleanData = stripOrganizationOverride(
-                opArgs.data as Record<string, unknown> | undefined,
+              const cleanData = sanitizeAuditLogData(
+                model,
+                stripOrganizationOverride(
+                  opArgs.data as Record<string, unknown> | undefined,
+                ),
               );
               return executeQuery({
                 ...opArgs,
@@ -429,12 +462,18 @@ export function withOrganizationIsolation(
               const rawData = opArgs.data;
               const scopedData = Array.isArray(rawData)
                 ? rawData.map((item) => ({
-                    ...stripOrganizationOverride(item as Record<string, unknown>),
+                    ...sanitizeAuditLogData(
+                      model,
+                      stripOrganizationOverride(item as Record<string, unknown>),
+                    ),
                     organizationId,
                   }))
                 : {
-                    ...stripOrganizationOverride(
-                      rawData as Record<string, unknown> | undefined,
+                    ...sanitizeAuditLogData(
+                      model,
+                      stripOrganizationOverride(
+                        rawData as Record<string, unknown> | undefined,
+                      ),
                     ),
                     organizationId,
                   };

@@ -24,6 +24,7 @@
     "release:check": "node scripts/release.mjs check",
     "release:version": "node scripts/release.mjs version",
     "release": "node scripts/release.mjs run",
+    "release:publish-sdk": "node scripts/release.mjs publish-sdk",
     "release:publish-ci": "node scripts/release.mjs publish-ci",
     "clean": "pnpm --filter @scace/db clean && pnpm --filter @scace/api clean && pnpm --filter @scace/docs clean && rm -rf dist .turbo"
   },

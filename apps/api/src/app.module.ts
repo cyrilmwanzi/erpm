@@ -50,7 +50,7 @@ import { VariantsModule } from "./variants/variants.module.js";
       disableTrustedOriginsCors: true,
       bodyParser: {
         json: { limit: "1mb" },
-        urlencoded: { limit: "1mb", extended: true },
+        urlencoded: { limit: "1mb", extended: false },
         rawBody: true,
       },
     }),

@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.json && node --test dist/payments/mpesa.spec.js dist/expiry/expiry-reporting.spec.js dist/billing/billing.spec.js",
+    "test": "tsc -p tsconfig.json && node --test dist/payments/mpesa.spec.js dist/expiry/expiry-reporting.spec.js dist/billing/billing.spec.js dist/auth/mcp-auth.spec.js",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {

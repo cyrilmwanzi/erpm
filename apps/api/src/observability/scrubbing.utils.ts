@@ -325,6 +325,7 @@ export interface NormalizedHttpError {
   error: string;
   code: string;
   message: string;
+  errorDescription?: string;
   issues?: unknown[];
 }
 
@@ -396,6 +397,12 @@ export function extractErrorDetails(
             ? "VALIDATION_ERROR"
             : defaultErrorCodeForStatus(statusCode);
 
+      const errorDescription =
+        typeof resp.error_description === "string" &&
+        resp.error_description.trim().length > 0
+          ? scrubStringValue(resp.error_description)
+          : undefined;
+
       return {
         statusCode,
         error:
@@ -404,6 +411,7 @@ export function extractErrorDetails(
             : errorLabel,
         code: explicitCode,
         message,
+        ...(errorDescription ? { errorDescription } : {}),
         ...(issues ? { issues } : {}),
       };
     }

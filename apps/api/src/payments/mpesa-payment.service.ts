@@ -252,7 +252,7 @@ export class MpesaPaymentService {
       targetType: PaymentTargetType.SALES_INVOICE,
       orderId: invoice.orderId,
       salesInvoiceId: invoice.id,
-      fulfillmentId: invoice.order.fulfillment?.id ?? null,
+      fulfillmentId: invoice.order?.fulfillment?.id ?? null,
       customerId: invoice.customerId,
       currency: invoice.currency,
       amountCents,
@@ -340,7 +340,7 @@ export class MpesaPaymentService {
     organizationId: string;
     actorUserId: string;
     targetType: PaymentTargetType;
-    orderId: string;
+    orderId: string | null;
     salesInvoiceId?: string | null;
     fulfillmentId?: string | null;
     customerId?: string | null;
@@ -1258,9 +1258,9 @@ export class MpesaPaymentService {
     amountCents: number,
   ): Promise<{
     targetType: PaymentTargetType;
-    orderId: string;
+    orderId: string | null;
     salesInvoiceId?: string;
-    fulfillmentId?: string;
+    fulfillmentId?: string | null;
     customerId: string | null;
     currency: string;
   } | null> {
@@ -1283,7 +1283,7 @@ export class MpesaPaymentService {
         targetType: PaymentTargetType.SALES_INVOICE,
         orderId: invoice.orderId,
         salesInvoiceId: invoice.id,
-        fulfillmentId: invoice.order.fulfillment?.id,
+        fulfillmentId: invoice.order?.fulfillment?.id ?? null,
         customerId: invoice.customerId,
         currency: invoice.currency,
       };
